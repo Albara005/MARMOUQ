@@ -328,7 +328,7 @@ export function AddLookDialog({ look, open, onClose }: { look: LookData; open: b
                 aria-describedby={missing.length ? `${titleId}-hint` : undefined}
               >
                 {!variants && loadState === "loading" ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : <ShoppingBag className="size-[1.1rem]" strokeWidth={1.6} aria-hidden />}
-                أضف الإطلالة إلى الحقيبة
+                أضف الإطلالة إلى السلة
               </Button>
               {missing.length > 0 && variants && unavailable.length === 0 && (
                 <p id={`${titleId}-hint`} className="mt-2 text-center text-xs text-taupe">

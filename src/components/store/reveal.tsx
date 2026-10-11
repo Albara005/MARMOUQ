@@ -69,6 +69,7 @@ export function RevealRoot() {
     const start = () => {
       if (started) return;
       started = true;
+      if (io) document.documentElement.classList.add("reveal-ready");
       scan(document);
       mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
     };
@@ -90,6 +91,7 @@ export function RevealRoot() {
       window.clearTimeout(fallback);
       io?.disconnect();
       mo.disconnect();
+      document.documentElement.classList.remove("reveal-ready");
     };
   }, []);
 

@@ -10,6 +10,7 @@ import { getVariantsForProducts } from "@/app/(store)/actions";
 import type { ProductCardData, ProductImage, VariantData } from "@/lib/catalog";
 import { percentOff } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { imagesForColor } from "@/lib/product-images";
 
 /* ───────────── Shared helpers (also used by the look dialog) ───────────── */
 
@@ -47,13 +48,7 @@ export async function loadVariants(productIds: number[]): Promise<Record<number,
 }
 
 /** Images for a colour: tagged ones, else untagged, else everything. */
-export function imagesForColor(images: ProductImage[], color?: string | null): ProductImage[] {
-  if (!color) return images;
-  const tagged = images.filter((i) => i.color === color);
-  if (tagged.length) return tagged;
-  const untagged = images.filter((i) => !i.color);
-  return untagged.length ? untagged : images;
-}
+export { imagesForColor };
 
 function coverAndHover(images: ProductImage[], color?: string | null): [ProductImage | null, ProductImage | null] {
   const list = imagesForColor(images, color);
@@ -93,7 +88,7 @@ export function ProductCard({
   else {
     if (off > 0) badges.push({ label: `-${off}%`, tone: "copper" });
     if (product.isNew) badges.push({ label: "جديد", tone: "light" });
-    if (product.badge) badges.push({ label: product.badge, tone: "light" });
+    if (product.badge && !badges.some((b) => b.label === product.badge)) badges.push({ label: product.badge, tone: "light" });
   }
 
   const visibleColors = product.colors.slice(0, 4);
@@ -287,7 +282,7 @@ function QuickAdd({ product, color }: { product: ProductCardData; color: string 
             className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg text-[0.8rem] font-medium text-espresso transition-colors hover:bg-espresso hover:text-paper disabled:text-mist"
           >
             {addedId === single.id ? <Check className="size-3.5" aria-hidden /> : <Plus className="size-3.5" aria-hidden />}
-            {single.stock <= 0 ? "نفدت الكمية" : addedId === single.id ? "أُضيفت إلى الحقيبة" : single.size ? `أضف إلى الحقيبة · ${single.size}` : "أضف إلى الحقيبة"}
+            {single.stock <= 0 ? "نفدت الكمية" : addedId === single.id ? "أُضيفت إلى السلة" : single.size ? `أضف إلى السلة · ${single.size}` : "أضف إلى السلة"}
           </button>
         ) : (
           <div>

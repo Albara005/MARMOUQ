@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { ArrowLeft, Plus } from "lucide-react";
 import { MediaImage } from "@/components/ui/media-image";
 import { Price } from "@/components/store/store-provider";
-import { imagesForColor } from "@/components/store/product-card";
+import { imagesForColor } from "@/lib/product-images";
 import type { LookData, LookItemData } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
 

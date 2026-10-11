@@ -1,0 +1,510 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { CreditCard, FileText, Globe, House, Search, Store, Truck, CircleAlert } from "lucide-react";
+import type { StoreSettings } from "@/lib/settings";
+import type { MediaLike } from "@/components/ui/media-image";
+import { formatMoney } from "@/lib/money";
+import { cn, whatsappLink } from "@/lib/utils";
+import { Input, Label, Select, Switch, Textarea } from "@/components/ui/field";
+import { ActionFieldError, ActionForm, ActionFormError, SubmitButton, useActionFormState } from "@/components/admin/ui-client";
+import { ImageUploader } from "@/components/admin/image-uploader";
+import { saveSettingsAction } from "@/app/admin/(panel)/settings/actions";
+import { ListEditor } from "./list-editors";
+
+type TabId = "identity" | "home" | "payments" | "shipping" | "policies" | "seo";
+const TABS: { id: TabId; label: string; icon: typeof Store; prefixes: string[] }[] = [
+  { id: "identity", label: "الهوية والتواصل", icon: Store, prefixes: ["storeName", "storeNameEn", "tagline", "description", "whatsapp", "phone", "email", "instagram", "tiktok", "address", "workingHours"] },
+  { id: "home", label: "الواجهة الرئيسية", icon: House, prefixes: ["hero", "announcements", "testimonials"] },
+  { id: "payments", label: "المدفوعات", icon: CreditCard, prefixes: ["payments"] },
+  { id: "shipping", label: "الشحن والعملة", icon: Truck, prefixes: ["currency", "freeShippingThreshold", "lowStockThreshold"] },
+  { id: "policies", label: "السياسات", icon: FileText, prefixes: ["policies"] },
+  { id: "seo", label: "محركات البحث", icon: Globe, prefixes: ["seo"] },
+];
+
+function tabOf(path: string): TabId | null {
+  const root = path.split(".")[0];
+  return TABS.find((t) => t.prefixes.includes(root))?.id ?? null;
+}
+
+/* ─────────── small field helpers ─────────── */
+
+function F({ label, name, hint, children, className }: { label: ReactNode; name: string; hint?: ReactNode; children: ReactNode; className?: string }) {
+  const { state } = useActionFormState();
+  const err = state && !state.ok ? state.fieldErrors?.[name] : undefined;
+  return (
+    <div className={className} data-invalid={err ? "" : undefined}>
+      <Label htmlFor={`s-${name}`}>{label}</Label>
+      {children}
+      {err ? <ActionFieldError name={name} /> : hint ? <p className="mt-1.5 text-xs leading-5 text-taupe">{hint}</p> : null}
+    </div>
+  );
+}
+
+function Section({ title, description, children, aside }: { title: string; description?: string; children: ReactNode; aside?: ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-line bg-paper p-5 shadow-[0_1px_2px_rgba(28,19,15,0.04)] md:p-6">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-[0.98rem] font-semibold text-espresso">{title}</h3>
+          {description && <p className="mt-0.5 text-[0.8rem] leading-relaxed text-taupe">{description}</p>}
+        </div>
+        {aside}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+const inputSm = "h-11";
+
+export function SettingsForm({ initial, heroMedia, initialTab }: { initial: StoreSettings; heroMedia: MediaLike | null; initialTab: string }) {
+  const [s, setS] = useState<StoreSettings>(initial);
+  const [saved, setSaved] = useState(() => JSON.stringify(initial));
+  const [hero, setHero] = useState<MediaLike[]>(heroMedia ? [heroMedia] : []);
+  const [tab, setTab] = useState<TabId>(TABS.some((t) => t.id === initialTab) ? (initialTab as TabId) : "identity");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const topRef = useRef<HTMLDivElement>(null);
+
+  const payload = useMemo(() => ({ ...s, hero: { ...s.hero, mediaId: hero[0]?.id ?? null } }), [s, hero]);
+  const json = JSON.stringify(payload);
+  const dirty = json !== saved;
+
+  // warn before leaving with unsaved changes
+  useEffect(() => {
+    if (!dirty) return;
+    const h = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", h);
+    return () => window.removeEventListener("beforeunload", h);
+  }, [dirty]);
+
+  const set = <K extends keyof StoreSettings>(k: K, v: StoreSettings[K]) => setS((p) => ({ ...p, [k]: v }));
+  const setIn = <K extends "hero" | "currency" | "policies" | "seo">(k: K, patch: Partial<StoreSettings[K]>) => setS((p) => ({ ...p, [k]: { ...p[k], ...patch } }));
+  const setPay = (k: "cod" | "transfer", patch: Partial<StoreSettings["payments"]["transfer"]>) =>
+    setS((p) => ({ ...p, payments: { ...p.payments, [k]: { ...p.payments[k], ...patch } } }));
+
+  const errTabs = new Set(Object.keys(errors).map(tabOf).filter(Boolean) as TabId[]);
+  const money = (n: number) => formatMoney(n, s.currency);
+  const igHandle = s.instagram.match(/instagram\.com\/([A-Za-z0-9._]+)/i)?.[1];
+
+  return (
+    <ActionForm
+      action={saveSettingsAction}
+      onResult={(r) => {
+        if (r.ok) {
+          const next = (r.data?.settings as StoreSettings | undefined) ?? payload;
+          setS(next);
+          setSaved(JSON.stringify({ ...next, hero: { ...next.hero, mediaId: hero[0]?.id ?? null } }));
+          setErrors({});
+        } else {
+          const fe = r.fieldErrors ?? {};
+          setErrors(fe);
+          const first = Object.keys(fe).map(tabOf).find(Boolean);
+          if (first && first !== tab) setTab(first);
+          topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }}
+      className="pb-24"
+    >
+      <input type="hidden" name="payload" value={json} />
+      <div ref={topRef} className="scroll-mt-24" />
+
+      <div className="grid items-start gap-5 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-8">
+        {/* Tabs */}
+        <nav aria-label="أقسام الإعدادات" className="no-scrollbar -mx-4 overflow-x-auto px-4 lg:sticky lg:top-24 lg:mx-0 lg:overflow-visible lg:px-0">
+          <ul role="tablist" aria-orientation="vertical" className="flex min-w-max gap-1.5 lg:min-w-0 lg:flex-col lg:gap-1">
+            {TABS.map((t) => {
+              const Icon = t.icon;
+              const active = t.id === tab;
+              return (
+                <li key={t.id} role="presentation">
+                  <button
+                    type="button"
+                    role="tab"
+                    id={`tab-${t.id}`}
+                    aria-selected={active}
+                    aria-controls={`panel-${t.id}`}
+                    onClick={() => setTab(t.id)}
+                    className={cn(
+                      "relative flex h-10 w-full items-center gap-2.5 rounded-full px-4 text-sm transition-colors lg:h-11 lg:rounded-xl",
+                      active ? "bg-espresso text-paper" : "bg-paper text-umber ring-1 ring-line hover:text-espresso lg:bg-transparent lg:ring-0 lg:hover:bg-bone",
+                    )}
+                  >
+                    <Icon className={cn("size-4 shrink-0", active ? "text-copper-soft" : "text-taupe")} aria-hidden />
+                    <span className="whitespace-nowrap">{t.label}</span>
+                    {errTabs.has(t.id) && <span className="ms-auto size-2 rounded-full bg-danger" aria-label="يحتوي على أخطاء" />}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+
+        <div className="min-w-0 space-y-5">
+          <ActionFormError />
+
+          {/* ── Identity ── */}
+          <div role="tabpanel" id="panel-identity" aria-labelledby="tab-identity" hidden={tab !== "identity"} className="space-y-5">
+            <Section title="هوية المتجر" description="الاسم والشعار النصي كما يظهران في رأس المتجر وتذييله.">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <F label="اسم المتجر" name="storeName">
+                  <Input id="s-storeName" className={inputSm} value={s.storeName} onChange={(e) => set("storeName", e.target.value)} />
+                </F>
+                <F label="الاسم اللاتيني" name="storeNameEn">
+                  <Input id="s-storeNameEn" className={inputSm} dir="ltr" value={s.storeNameEn} onChange={(e) => set("storeNameEn", e.target.value)} />
+                </F>
+                <F label="الشعار النصي" name="tagline" className="sm:col-span-2">
+                  <Input id="s-tagline" className={inputSm} value={s.tagline} onChange={(e) => set("tagline", e.target.value)} />
+                </F>
+                <F label="نبذة قصيرة" name="description" className="sm:col-span-2" hint={`${s.description.length}/400 — تظهر في التذييل وصفحة «عن مرموق».`}>
+                  <Textarea id="s-description" rows={3} value={s.description} onChange={(e) => set("description", e.target.value)} />
+                </F>
+              </div>
+            </Section>
+            <Section title="قنوات التواصل" description="الحقول الفارغة تُخفى من المتجر تلقائياً — وإن غاب واتساب يُستبدل بإنستغرام.">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <F
+                  label="واتساب الطلبات"
+                  name="whatsapp"
+                  hint={
+                    s.whatsapp ? (
+                      <a href={whatsappLink(s.whatsapp)} target="_blank" rel="noopener noreferrer" className="text-copper-deep underline-offset-4 hover:underline" dir="ltr">
+                        {whatsappLink(s.whatsapp).replace("https://", "")}
+                      </a>
+                    ) : (
+                      "مع رمز الدولة، مثل 967770000000"
+                    )
+                  }
+                >
+                  <Input id="s-whatsapp" className={inputSm} dir="ltr" inputMode="tel" placeholder="967770000000" value={s.whatsapp} onChange={(e) => set("whatsapp", e.target.value)} style={{ textAlign: "right" }} />
+                </F>
+                <F label="رقم الاتصال" name="phone">
+                  <Input id="s-phone" className={inputSm} dir="ltr" inputMode="tel" value={s.phone} onChange={(e) => set("phone", e.target.value)} style={{ textAlign: "right" }} />
+                </F>
+                <F label="البريد الإلكتروني" name="email">
+                  <Input id="s-email" className={inputSm} dir="ltr" type="email" value={s.email} onChange={(e) => set("email", e.target.value)} style={{ textAlign: "right" }} />
+                </F>
+                <F label="إنستغرام" name="instagram" hint={igHandle ? `@${igHandle}` : "الرابط الكامل أو المعرّف مثل @marmouq.ye"}>
+                  <Input id="s-instagram" className={inputSm} dir="ltr" value={s.instagram} onChange={(e) => set("instagram", e.target.value)} style={{ textAlign: "right" }} />
+                </F>
+                <F label="تيك توك" name="tiktok">
+                  <Input id="s-tiktok" className={inputSm} dir="ltr" value={s.tiktok} onChange={(e) => set("tiktok", e.target.value)} style={{ textAlign: "right" }} />
+                </F>
+                <F label="العنوان" name="address">
+                  <Input id="s-address" className={inputSm} value={s.address} onChange={(e) => set("address", e.target.value)} />
+                </F>
+                <F label="ساعات العمل" name="workingHours" className="sm:col-span-2">
+                  <Input id="s-workingHours" className={inputSm} value={s.workingHours} onChange={(e) => set("workingHours", e.target.value)} />
+                </F>
+              </div>
+            </Section>
+          </div>
+
+          {/* ── Home ── */}
+          <div role="tabpanel" id="panel-home" aria-labelledby="tab-home" hidden={tab !== "home"} className="space-y-5">
+            <Section title="الواجهة الرئيسية" description="أول ما يراه العميل — اجعل العنوان قصيراً وواثقاً.">
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <F label="سطر علوي صغير" name="hero.eyebrow" className="sm:col-span-2">
+                    <Input id="s-hero.eyebrow" className={inputSm} value={s.hero.eyebrow} onChange={(e) => setIn("hero", { eyebrow: e.target.value })} />
+                  </F>
+                  <F label="العنوان" name="hero.title" className="sm:col-span-2" hint="استخدم سطراً جديداً لكسر العنوان على سطرين.">
+                    <Textarea id="s-hero.title" rows={2} className="min-h-0 text-lg" value={s.hero.title} onChange={(e) => setIn("hero", { title: e.target.value })} />
+                  </F>
+                  <F label="النص التعريفي" name="hero.subtitle" className="sm:col-span-2">
+                    <Textarea id="s-hero.subtitle" rows={3} value={s.hero.subtitle} onChange={(e) => setIn("hero", { subtitle: e.target.value })} />
+                  </F>
+                  <F label="نص الزر" name="hero.ctaLabel">
+                    <Input id="s-hero.ctaLabel" className={inputSm} value={s.hero.ctaLabel} onChange={(e) => setIn("hero", { ctaLabel: e.target.value })} />
+                  </F>
+                  <F label="رابط الزر" name="hero.ctaHref" hint="/shop أو /looks/burgundy-edit">
+                    <Input id="s-hero.ctaHref" className={inputSm} dir="ltr" value={s.hero.ctaHref} onChange={(e) => setIn("hero", { ctaHref: e.target.value })} style={{ textAlign: "right" }} />
+                  </F>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-umber">معاينة</p>
+                  <div className="grain relative overflow-hidden rounded-xl bg-espresso p-5 text-paper" aria-hidden>
+                    {hero[0] && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={`/media/${hero[0].id}/sm`} alt="" className="absolute inset-0 h-full w-full object-cover opacity-45" />
+                    )}
+                    <div className="relative z-10 flex min-h-[220px] flex-col justify-end">
+                      <p className="text-[0.6rem] tracking-[0.25em] text-copper-soft">{s.hero.eyebrow}</p>
+                      <p className="display mt-2 whitespace-pre-line text-[1.35rem] leading-tight">{s.hero.title || "العنوان"}</p>
+                      <p className="mt-2 line-clamp-3 text-[0.7rem] leading-5 text-paper/75">{s.hero.subtitle}</p>
+                      <span className="mt-3 inline-flex h-8 w-fit items-center rounded-full bg-paper px-4 text-[0.7rem] font-medium text-espresso">{s.hero.ctaLabel || "الزر"}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-6 border-t border-line pt-5">
+                <ImageUploader
+                  value={hero}
+                  onChange={setHero}
+                  multiple={false}
+                  label="صورة الواجهة"
+                  hint="صورة عمودية أو أفقية بجودة عالية. إن تُركت فارغة تُستخدم صورة أول إطلالة مميزة."
+                  alt={s.hero.title.replace(/\n/g, " ")}
+                />
+                <ActionFieldError name="hero.mediaId" />
+              </div>
+            </Section>
+
+            <Section title="شريط الإعلانات" description="رسائل قصيرة تتناوب أعلى المتجر. الترتيب هنا هو ترتيب الظهور.">
+              <div className="mb-4 overflow-hidden rounded-lg bg-espresso px-4 py-2 text-center text-[0.72rem] text-paper/90" aria-hidden>
+                {s.announcements.length ? s.announcements.join("  ✦  ") : "لن يظهر الشريط"}
+              </div>
+              <ListEditor
+                items={s.announcements}
+                onChange={(v) => set("announcements", v)}
+                create={() => ""}
+                max={8}
+                addLabel="إضافة رسالة"
+                emptyLabel="لا رسائل — سيختفي الشريط من المتجر."
+                itemLabel={(i) => `الرسالة ${i + 1}`}
+                render={(item, update, i) => (
+                  <>
+                    <label htmlFor={`s-ann-${i}`} className="sr-only">{`الرسالة ${i + 1}`}</label>
+                    <Input id={`s-ann-${i}`} className="h-10 text-sm" value={item} maxLength={120} onChange={(e) => update(e.target.value)} placeholder="مثلاً: توصيل مجاني للطلبات فوق 60,000 ر.ي" />
+                    <ActionFieldError name={`announcements.${i}`} />
+                  </>
+                )}
+              />
+            </Section>
+
+            <Section title="آراء العملاء" description="شهادات حقيقية من عملائك تظهر في الصفحة الرئيسية.">
+              <ListEditor
+                items={s.testimonials}
+                onChange={(v) => set("testimonials", v)}
+                create={() => ({ name: "", city: "", quote: "" })}
+                max={12}
+                addLabel="إضافة شهادة"
+                emptyLabel="لا شهادات — سيُخفى القسم من الصفحة الرئيسية."
+                itemLabel={(i) => `الشهادة ${i + 1}`}
+                render={(t, update, i) => (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <label htmlFor={`s-tn-${i}`} className="sr-only">الاسم</label>
+                      <Input id={`s-tn-${i}`} className="h-10 text-sm" placeholder="الاسم" value={t.name} onChange={(e) => update({ ...t, name: e.target.value })} />
+                      <ActionFieldError name={`testimonials.${i}.name`} />
+                    </div>
+                    <div>
+                      <label htmlFor={`s-tc-${i}`} className="sr-only">المدينة</label>
+                      <Input id={`s-tc-${i}`} className="h-10 text-sm" placeholder="المدينة" value={t.city} onChange={(e) => update({ ...t, city: e.target.value })} />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label htmlFor={`s-tq-${i}`} className="sr-only">نص الشهادة</label>
+                      <Textarea id={`s-tq-${i}`} rows={2} className="min-h-0 text-sm" placeholder="ماذا قال العميل؟" value={t.quote} onChange={(e) => update({ ...t, quote: e.target.value })} />
+                      <ActionFieldError name={`testimonials.${i}.quote`} />
+                    </div>
+                  </div>
+                )}
+              />
+            </Section>
+          </div>
+
+          {/* ── Payments ── */}
+          <div role="tabpanel" id="panel-payments" aria-labelledby="tab-payments" hidden={tab !== "payments"} className="space-y-5">
+            <Section
+              title="الدفع عند الاستلام"
+              description="الطريقة الأكثر طلباً في اليمن."
+              aside={<Switch checked={s.payments.cod.enabled} onChange={(e) => setPay("cod", { enabled: e.target.checked })} label={s.payments.cod.enabled ? "مفعّل" : "موقوف"} />}
+            >
+              <ActionFieldError name="payments.cod.enabled" className="-mt-3 mb-3" />
+              <div className={cn("grid gap-4 sm:grid-cols-2", !s.payments.cod.enabled && "opacity-60")}>
+                <F label="الاسم الظاهر للعميل" name="payments.cod.label">
+                  <Input id="s-payments.cod.label" className={inputSm} value={s.payments.cod.label} onChange={(e) => setPay("cod", { label: e.target.value })} />
+                </F>
+                <F label="ملاحظة" name="payments.cod.note" className="sm:col-span-2">
+                  <Textarea id="s-payments.cod.note" rows={2} value={s.payments.cod.note} onChange={(e) => setPay("cod", { note: e.target.value })} />
+                </F>
+              </div>
+            </Section>
+            <Section
+              title="حوالة / محفظة إلكترونية"
+              description="الكريمي، النجم، جوالي، ون كاش… أضف الحسابات التي تظهر للعميل بعد الطلب."
+              aside={<Switch checked={s.payments.transfer.enabled} onChange={(e) => setPay("transfer", { enabled: e.target.checked })} label={s.payments.transfer.enabled ? "مفعّل" : "موقوف"} />}
+            >
+              <div className={cn("space-y-5", !s.payments.transfer.enabled && "opacity-60")}>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <F label="الاسم الظاهر للعميل" name="payments.transfer.label">
+                    <Input id="s-payments.transfer.label" className={inputSm} value={s.payments.transfer.label} onChange={(e) => setPay("transfer", { label: e.target.value })} />
+                  </F>
+                  <F label="التعليمات" name="payments.transfer.note" className="sm:col-span-2">
+                    <Textarea id="s-payments.transfer.note" rows={2} value={s.payments.transfer.note} onChange={(e) => setPay("transfer", { note: e.target.value })} />
+                  </F>
+                </div>
+                <div>
+                  <p className="mb-2 text-sm font-medium text-umber">الحسابات</p>
+                  <ActionFieldError name="payments.transfer.accounts" className="mb-2" />
+                  <ListEditor
+                    items={s.payments.transfer.accounts}
+                    onChange={(v) => setPay("transfer", { accounts: v })}
+                    create={() => ({ bank: "", holder: "", number: "" })}
+                    max={8}
+                    addLabel="إضافة حساب"
+                    emptyLabel="لا حسابات بعد."
+                    itemLabel={(i) => `الحساب ${i + 1}`}
+                    render={(a, update, i) => (
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        <div>
+                          <label htmlFor={`s-ab-${i}`} className="sr-only">الجهة</label>
+                          <Input id={`s-ab-${i}`} className="h-10 text-sm" placeholder="الجهة (الكريمي)" value={a.bank} onChange={(e) => update({ ...a, bank: e.target.value })} />
+                          <ActionFieldError name={`payments.transfer.accounts.${i}.bank`} />
+                        </div>
+                        <div>
+                          <label htmlFor={`s-ah-${i}`} className="sr-only">اسم المستفيد</label>
+                          <Input id={`s-ah-${i}`} className="h-10 text-sm" placeholder="اسم المستفيد" value={a.holder} onChange={(e) => update({ ...a, holder: e.target.value })} />
+                        </div>
+                        <div>
+                          <label htmlFor={`s-an-${i}`} className="sr-only">رقم الحساب</label>
+                          <Input id={`s-an-${i}`} className="h-10 text-sm" dir="ltr" placeholder="رقم الحساب" value={a.number} onChange={(e) => update({ ...a, number: e.target.value })} style={{ textAlign: "right" }} />
+                          <ActionFieldError name={`payments.transfer.accounts.${i}.number`} />
+                        </div>
+                      </div>
+                    )}
+                  />
+                </div>
+              </div>
+            </Section>
+          </div>
+
+          {/* ── Shipping & currency ── */}
+          <div role="tabpanel" id="panel-shipping" aria-labelledby="tab-shipping" hidden={tab !== "shipping"} className="space-y-5">
+            <Section title="الشحن والمخزون">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <F
+                  label="حد الشحن المجاني"
+                  name="freeShippingThreshold"
+                  hint={s.freeShippingThreshold > 0 ? `يظهر للعميل: «أضف ${money(Math.round(s.freeShippingThreshold / 4))} للحصول على شحن مجاني»` : "0 = بدون شحن مجاني"}
+                >
+                  <div className="relative">
+                    <Input
+                      id="s-freeShippingThreshold"
+                      className={cn(inputSm, "pe-14")}
+                      inputMode="numeric"
+                      dir="ltr"
+                      style={{ textAlign: "right" }}
+                      value={String(s.freeShippingThreshold)}
+                      onChange={(e) => set("freeShippingThreshold", Number(e.target.value.replace(/\D/g, "")) || 0)}
+                    />
+                    <span className="pointer-events-none absolute end-4 top-1/2 -translate-y-1/2 text-sm text-taupe">{s.currency.symbol}</span>
+                  </div>
+                </F>
+                <F label="تنبيه انخفاض المخزون" name="lowStockThreshold" hint="تُعلَّم القطعة «قاربت على النفاد» عند هذا العدد أو أقل.">
+                  <Input
+                    id="s-lowStockThreshold"
+                    className={inputSm}
+                    inputMode="numeric"
+                    dir="ltr"
+                    style={{ textAlign: "right" }}
+                    value={String(s.lowStockThreshold)}
+                    onChange={(e) => set("lowStockThreshold", Number(e.target.value.replace(/\D/g, "")) || 0)}
+                  />
+                </F>
+              </div>
+            </Section>
+            <Section title="العملة" description="الأسعار تُخزّن كأرقام صحيحة؛ تغيير العملة لا يحوّل الأسعار." aside={<span className="rounded-full bg-bone px-3 py-1 text-sm font-semibold tabular-nums text-espresso">{money(125000)}</span>}>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <F label="الرمز الدولي" name="currency.code">
+                  <Input id="s-currency.code" className={inputSm} dir="ltr" maxLength={3} value={s.currency.code} onChange={(e) => setIn("currency", { code: e.target.value.toUpperCase() })} style={{ textAlign: "right" }} />
+                </F>
+                <F label="الرمز الظاهر" name="currency.symbol">
+                  <Input id="s-currency.symbol" className={inputSm} value={s.currency.symbol} onChange={(e) => setIn("currency", { symbol: e.target.value })} />
+                </F>
+                <F label="موضع الرمز" name="currency.position">
+                  <Select id="s-currency.position" className={inputSm} value={s.currency.position} onChange={(e) => setIn("currency", { position: e.target.value as "after" | "before" })}>
+                    <option value="after">بعد الرقم (125,000 ر.ي)</option>
+                    <option value="before">قبل الرقم ($ 125)</option>
+                  </Select>
+                </F>
+              </div>
+            </Section>
+          </div>
+
+          {/* ── Policies ── */}
+          <div role="tabpanel" id="panel-policies" aria-labelledby="tab-policies" hidden={tab !== "policies"} className="space-y-5">
+            <Section title="السياسات" description="تظهر في صفحات السياسات وصفحة إتمام الطلب. اكتب بلغة بسيطة وواضحة.">
+              <div className="space-y-4">
+                <F label="الشحن والتوصيل" name="policies.shipping">
+                  <Textarea id="s-policies.shipping" rows={5} value={s.policies.shipping} onChange={(e) => setIn("policies", { shipping: e.target.value })} />
+                </F>
+                <F label="الاستبدال والإرجاع" name="policies.returns">
+                  <Textarea id="s-policies.returns" rows={5} value={s.policies.returns} onChange={(e) => setIn("policies", { returns: e.target.value })} />
+                </F>
+                <F label="الخصوصية" name="policies.privacy">
+                  <Textarea id="s-policies.privacy" rows={5} value={s.policies.privacy} onChange={(e) => setIn("policies", { privacy: e.target.value })} />
+                </F>
+              </div>
+            </Section>
+          </div>
+
+          {/* ── SEO ── */}
+          <div role="tabpanel" id="panel-seo" aria-labelledby="tab-seo" hidden={tab !== "seo"} className="space-y-5">
+            <Section title="محركات البحث والمشاركة" description="العنوان والوصف اللذان يظهران في Google وعند مشاركة رابط المتجر.">
+              <div className="space-y-4">
+                <F label="عنوان الصفحة" name="seo.title" hint={`${s.seo.title.length}/60 حرفاً مثالياً`}>
+                  <Input id="s-seo.title" className={inputSm} value={s.seo.title} onChange={(e) => setIn("seo", { title: e.target.value })} />
+                </F>
+                <F label="الوصف" name="seo.description" hint={`${s.seo.description.length}/160 حرفاً مثالياً`}>
+                  <Textarea id="s-seo.description" rows={3} value={s.seo.description} onChange={(e) => setIn("seo", { description: e.target.value })} />
+                </F>
+                <div className="rounded-xl border border-line bg-white p-4" aria-hidden>
+                  <p className="flex items-center gap-2 text-xs text-taupe">
+                    <Search className="size-3.5" />
+                    معاينة نتيجة البحث
+                  </p>
+                  <p className="mt-2 truncate text-[1.05rem] text-[#1a0dab]">{s.seo.title || "عنوان الصفحة"}</p>
+                  <p className="text-xs text-[#006621]" dir="ltr" style={{ textAlign: "right" }}>
+                    marmouq.store
+                  </p>
+                  <p className="mt-0.5 line-clamp-2 text-[0.8rem] leading-5 text-[#545454]">{s.seo.description}</p>
+                </div>
+              </div>
+            </Section>
+          </div>
+        </div>
+      </div>
+
+      {/* Save bar */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-paper/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md lg:start-[264px]">
+        <div className="mx-auto flex max-w-[1320px] items-center justify-between gap-3 lg:px-6">
+          <div className="flex items-center gap-2">
+            <SubmitButton disabled={!dirty} pendingLabel="جارٍ الحفظ…" className="min-w-36">
+              حفظ الإعدادات
+            </SubmitButton>
+            {dirty && (
+              <button
+                type="button"
+                onClick={() => {
+                  const base = JSON.parse(saved) as StoreSettings;
+                  setS(base);
+                  setHero(base.hero.mediaId ? (hero[0]?.id === base.hero.mediaId ? hero : heroMedia && heroMedia.id === base.hero.mediaId ? [heroMedia] : [{ id: base.hero.mediaId }]) : []);
+                  setErrors({});
+                }}
+                className="hidden h-10 rounded-full px-4 text-sm text-taupe hover:bg-bone hover:text-espresso sm:inline-flex sm:items-center"
+              >
+                تراجع
+              </button>
+            )}
+          </div>
+          <p className={cn("flex items-center gap-2 text-sm", dirty ? "text-copper-deep" : "text-taupe")} aria-live="polite">
+            {dirty ? (
+              <>
+                <span className="size-2 rounded-full bg-copper" aria-hidden />
+                تغييرات غير محفوظة
+              </>
+            ) : Object.keys(errors).length ? (
+              <>
+                <CircleAlert className="size-4 text-danger" aria-hidden />
+                <span className="text-danger">راجع الحقول المظلّلة</span>
+              </>
+            ) : (
+              "كل التغييرات محفوظة"
+            )}
+          </p>
+        </div>
+      </div>
+    </ActionForm>
+  );
+}

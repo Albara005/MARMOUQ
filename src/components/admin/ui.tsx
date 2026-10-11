@@ -323,7 +323,7 @@ export function Tr({ children, className, selected }: { children: ReactNode; cla
 type Align = "start" | "center" | "end";
 const alignCls: Record<Align, string> = { start: "text-start", center: "text-center", end: "text-end" };
 
-export function Th({ children, className, align = "start", ...rest }: React.ThHTMLAttributes<HTMLTableCellElement> & { align?: Align }) {
+export function Th({ children, className, align = "start", ...rest }: Omit<React.ThHTMLAttributes<HTMLTableCellElement>, "align"> & { align?: Align }) {
   return (
     <th
       scope="col"
@@ -341,7 +341,7 @@ export function Td({
   align = "start",
   numeric,
   ...rest
-}: React.TdHTMLAttributes<HTMLTableCellElement> & { align?: Align; numeric?: boolean }) {
+}: Omit<React.TdHTMLAttributes<HTMLTableCellElement>, "align"> & { align?: Align; numeric?: boolean }) {
   return (
     <td
       className={cn(
