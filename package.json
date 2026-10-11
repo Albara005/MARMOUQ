@@ -1,0 +1,40 @@
+{
+  "name": "marmouq-store",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MARMOUQ — متجر مرموق للأزياء الرجالية الراقية مع لوحة تحكم متكاملة",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "node scripts/migrate.mjs && next start -H 0.0.0.0 -p ${PORT:-3000}",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node scripts/migrate.mjs",
+    "db:seed": "node scripts/seed.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20.9"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "drizzle-orm": "^0.45.4",
+    "jose": "^6.2.12",
+    "lucide-react": "^1.54.0",
+    "next": "^16.4.0",
+    "postgres": "^3.4.9",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "server-only": "^0.0.1",
+    "sharp": "^0.35.5",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "drizzle-kit": "^0.31.11",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2"
+  }
+}
