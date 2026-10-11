@@ -92,12 +92,19 @@ export function useModal({
     const previouslyFocused = document.activeElement as HTMLElement | null;
     lockScroll();
 
-    const focusTimer = window.setTimeout(() => {
+    // The panel may mount a frame or two after `open` flips (presence + portal), so retry briefly.
+    let tries = 0;
+    let focusTimer = 0;
+    const focusInitial = () => {
       const root = containerRef.current;
-      if (!root) return;
+      if (!root) {
+        if (tries++ < 12) focusTimer = window.setTimeout(focusInitial, 40);
+        return;
+      }
       const target = initialFocusRef?.current ?? focusables(root)[0] ?? root;
       target.focus({ preventScroll: true });
-    }, 60);
+    };
+    focusTimer = window.setTimeout(focusInitial, 50);
 
     const onKey = (e: KeyboardEvent) => {
       if (stack[stack.length - 1] !== id) return;
