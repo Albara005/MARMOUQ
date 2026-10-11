@@ -125,6 +125,14 @@ async function main() {
 main().then(
   () => process.exit(0),
   (err) => {
+    if (!process.env.DATABASE_URL) {
+      banner([
+        "DATABASE_URL is missing — the store cannot start without PostgreSQL.",
+        "Railway: + New -> Database -> PostgreSQL, then in this service's",
+        "Variables add  DATABASE_URL = ${{Postgres.DATABASE_URL}}  and redeploy.",
+        "قاعدة البيانات غير مربوطة: أضف PostgreSQL ثم المتغير DATABASE_URL",
+      ]);
+    }
     console.error("[migrate] FAILED:", err);
     process.exit(1);
   },
