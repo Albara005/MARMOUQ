@@ -1,4 +1,4 @@
-import { getDisplayCurrency, getSettings, toPublicConfig } from "@/lib/settings";
+import { copyOf, getDisplayCurrency, getSettings, toPublicConfig } from "@/lib/settings";
 import { listCategories, type CategoryData } from "@/lib/catalog";
 import { StoreConfigProvider } from "@/components/store/store-provider";
 import { CartProvider, WishlistProvider } from "@/components/store/cart/cart-provider";
@@ -8,6 +8,7 @@ import { Footer } from "@/components/store/footer";
 import { CartDrawer } from "@/components/store/cart-drawer";
 import { WhatsAppFab } from "@/components/store/whatsapp-fab";
 import { RevealRoot } from "@/components/store/reveal";
+import { themeCss } from "@/lib/theme";
 
 /**
  * Storefront chrome shared by the (store) layout and the root not-found page:
@@ -29,6 +30,7 @@ export async function StoreShell({ children }: { children: React.ReactNode }) {
     <StoreConfigProvider config={toPublicConfig(settings, display)}>
       <CartProvider>
         <WishlistProvider>
+          {themeCss(settings.theme) && <style dangerouslySetInnerHTML={{ __html: themeCss(settings.theme) }} />}
           <div className="flex min-h-dvh flex-col">
             <a
               href="#main"
@@ -63,6 +65,7 @@ export async function StoreShell({ children }: { children: React.ReactNode }) {
                 address: settings.address,
               }}
               categories={nav}
+              copy={copyOf(settings)}
             />
           </div>
           <CartDrawer />

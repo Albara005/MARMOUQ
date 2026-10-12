@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { copyOf, getSettings } from "@/lib/settings";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { listCategories, listLooks, listProducts } from "@/lib/catalog";
@@ -26,6 +27,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AtelierPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const c = copyOf(await getSettings());
   const [params, categories, looks] = await Promise.all([searchParams, listCategories(), listLooks(24)]);
 
   const slotCategories = categories
@@ -83,11 +85,11 @@ export default async function AtelierPage({ searchParams }: { searchParams: Prom
           <div className="max-w-2xl">
             <p className="eyebrow inline-flex items-center gap-3">
               <span className="h-px w-8 bg-gold/70" aria-hidden />
-              The Atelier · الأتيليه
+              {c["atelier.eyebrow"]}
             </p>
-            <h1 className="display mt-3 text-[2.35rem] leading-[1.12] text-espresso text-balance md:text-[3.4rem]">منسّق الإطلالة</h1>
+            <h1 className="display mt-3 text-[2.35rem] leading-[1.12] text-espresso text-balance md:text-[3.4rem]">{c["atelier.title"]}</h1>
             <p className="mt-3 max-w-xl text-[0.95rem] leading-8 text-umber text-pretty md:text-base">
-              قطعة لكل خانة، من التريكو حتى الحذاء — وشوف طقمك يكتمل قدّامك قبل ما تطلبه. ما تدري من وين تبدأ؟ خلّنا نلهمك.
+              {c["atelier.intro"]}
             </p>
           </div>
           <ol className="hidden shrink-0 gap-8 text-sm text-umber lg:flex" aria-label="خطوات التنسيق">

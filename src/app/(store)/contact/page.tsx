@@ -10,7 +10,7 @@ import {
   Plus,
   Sparkles,
 } from "lucide-react";
-import { getDisplayCurrency, getSettings } from "@/lib/settings";
+import { copyOf, getDisplayCurrency, getSettings } from "@/lib/settings";
 import { listShippingZones } from "@/lib/catalog";
 import { formatMoney } from "@/lib/money";
 import { whatsappLink, cn } from "@/lib/utils";
@@ -51,6 +51,7 @@ type Faq = { q: string; a: React.ReactNode; plain: string };
 
 export default async function ContactPage() {
   const [s, zones] = await Promise.all([getSettings(), listShippingZones()]);
+  const c = copyOf(s);
   const displayCurrency = await getDisplayCurrency(s);
   const money = (n: number) => formatMoney(n, displayCurrency);
 
@@ -169,7 +170,7 @@ export default async function ContactPage() {
 
   const contactWord = s.whatsapp ? "واتساب" : "رسائل إنستغرام";
 
-  const faqs: Faq[] = [
+  const builtInFaqs: Faq[] = [
     {
       q: "كم يأخذ التوصيل، وكم رسومه؟",
       plain: shipText,
@@ -225,6 +226,7 @@ export default async function ContactPage() {
       ),
     },
   ];
+  const faqs: Faq[] = s.faq.length ? s.faq.map((f) => ({ q: f.q, plain: f.a, a: f.a })) : builtInFaqs;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -246,9 +248,9 @@ export default async function ContactPage() {
       />
 
       <PageHeader
-        eyebrow="Concierge · تواصل معنا"
-        title="حيّاك في مرموق"
-        subtitle="فريقنا يرد عليك بنفسه — نساعدك تختار المقاس، ننسّق لك طقمك، ونتابع طلبك لين يوصل بابك."
+        eyebrow={c["contact.eyebrow"]}
+        title={c["contact.title"]}
+        subtitle={c["contact.subtitle"]}
         breadcrumbs={[
           { label: "الرئيسية", href: "/" },
           { label: "تواصل معنا" },

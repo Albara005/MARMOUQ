@@ -4,13 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { ArrowLeft, ChevronDown, Heart, Menu, Search, ShoppingBag } from "lucide-react";
-import { Wordmark } from "@/components/ui/wordmark";
 import { MediaImage } from "@/components/ui/media-image";
 import { useCart, useWishlist } from "@/components/store/cart/cart-provider";
 import { MobileMenu } from "@/components/store/mobile-menu";
 import { SearchOverlay } from "@/components/store/search-overlay";
 import { CurrencySwitcher } from "@/components/store/currency-switcher";
-import { NAV_LINKS, categoryHref } from "@/components/store/nav";
+import { BrandLogo } from "@/components/store/brand-logo";
+import { useStoreConfig } from "@/components/store/store-provider";
+import { categoryHref } from "@/components/store/nav";
 import type { MediaRef } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
 
@@ -65,6 +66,7 @@ function CountBadge({ count, light }: { count: number; light: boolean }) {
 }
 
 export function Header({ categories }: { categories: NavCategory[] }) {
+  const { nav: navLinks } = useStoreConfig();
   const pathname = usePathname();
   const cart = useCart();
   const wishlist = useWishlist();
@@ -167,7 +169,7 @@ export function Header({ categories }: { categories: NavCategory[] }) {
                     <ChevronDown className={cn("size-3.5 transition-transform duration-300", megaOpen && "rotate-180")} aria-hidden />
                   </button>
                 </li>
-                {NAV_LINKS.map((l) => (
+                {navLinks.map((l) => (
                   <li key={l.href} onMouseEnter={closeMega}>
                     <Link href={l.href} className={navLink(isActive(l.href))} aria-current={isActive(l.href) ? "page" : undefined}>
                       {l.label}
@@ -181,10 +183,10 @@ export function Header({ categories }: { categories: NavCategory[] }) {
           {/* Centre: wordmark */}
           <Link href="/" className="justify-self-center rounded-sm px-2 py-1" aria-label="مرموق — الصفحة الرئيسية">
             <span className="block lg:hidden">
-              <Wordmark tone={light ? "light" : "dark"} size="sm" className="transition-colors duration-500" />
+              <BrandLogo tone={light ? "light" : "dark"} size="sm" />
             </span>
             <span className="hidden lg:block">
-              <Wordmark tone={light ? "light" : "dark"} size="md" className="transition-colors duration-500" />
+              <BrandLogo tone={light ? "light" : "dark"} size="md" />
             </span>
           </Link>
 

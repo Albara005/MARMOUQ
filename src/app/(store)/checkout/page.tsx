@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getSettings } from "@/lib/settings";
+import { copyOf, getSettings } from "@/lib/settings";
 import { listShippingZones, type ShippingZoneData } from "@/lib/catalog";
 import { CheckoutForm, type CheckoutPayments } from "@/components/store/checkout/checkout-form";
 import { CheckoutSteps } from "@/components/store/checkout/steps";
@@ -13,6 +13,7 @@ export const metadata: Metadata = {
 
 export default async function CheckoutPage() {
   const settings = await getSettings();
+  const c = copyOf(settings);
   let zones: ShippingZoneData[] = [];
   try {
     zones = await listShippingZones();
@@ -39,8 +40,8 @@ export default async function CheckoutPage() {
           <span className="h-px w-8 bg-gold/70" aria-hidden />
           SECURE CHECKOUT
         </p>
-        <h1 className="display mt-3 text-4xl text-espresso md:text-5xl">إتمام الطلب</h1>
-        <p className="mt-3 max-w-xl text-[0.95rem] leading-8 text-umber">خطوة وحدة وتصير قطعك في الطريق إليك — بدون تسجيل حساب، وتدفع عند الاستلام.</p>
+        <h1 className="display mt-3 text-4xl text-espresso md:text-5xl">{c["checkout.title"]}</h1>
+        <p className="mt-3 max-w-xl text-[0.95rem] leading-8 text-umber">{c["checkout.subtitle"]}</p>
       </header>
       <CheckoutForm zones={zones} payments={payments} />
     </div>

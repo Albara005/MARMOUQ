@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { copyOf, getSettings } from "@/lib/settings";
 import { listProducts } from "@/lib/catalog";
 import { PageHeader } from "@/components/store/page-header";
 import { WishlistView } from "@/components/store/catalog/wishlist-view";
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
 };
 
 export default async function WishlistPage() {
+  const c = copyOf(await getSettings());
   let picks: Awaited<ReturnType<typeof listProducts>>["items"] = [];
   try {
     picks = (await listProducts({ featured: true, limit: 4 })).items;
@@ -22,8 +24,8 @@ export default async function WishlistPage() {
     <>
       <PageHeader
         eyebrow="Wishlist"
-        title="قائمتي المفضلة"
-        subtitle="القطع اللي لفتت نظرك، محفوظة هنا لين تقرر. القائمة محفوظة على هذا الجهاز."
+        title={c["wishlist.title"]}
+        subtitle={c["wishlist.subtitle"]}
         breadcrumbs={[{ label: "الرئيسية", href: "/" }, { label: "المفضلة" }]}
       />
       <WishlistView picks={picks} />

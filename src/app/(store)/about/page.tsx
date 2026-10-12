@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { ArrowLeft, Sparkles } from "lucide-react";
-import { getSettings } from "@/lib/settings";
-import { listLooks, listProducts, listShippingZones, type MediaRef, type ProductCardData } from "@/lib/catalog";
+import { copyOf, getSettings } from "@/lib/settings";
+import { listLooks, listProducts, listShippingZones, type MediaRef, type ProductCardData, getMediaRefs } from "@/lib/catalog";
 import { imagesForColor } from "@/lib/product-images";
 import { PageHeader } from "@/components/store/page-header";
 import { MediaImage } from "@/components/ui/media-image";
@@ -21,6 +21,10 @@ type Chapter = { latin: string; title: string; body: string; image: MediaRef | n
 
 export default async function AboutPage() {
   const [settings, { items: products }, looks, zones] = await Promise.all([getSettings(), listProducts({ limit: 24 }), listLooks(6), listShippingZones()]);
+  const c = copyOf(settings);
+  const imageKeys = ["about.cover", "about.ch1.image", "about.ch2.image", "about.ch3.image", "about.ch4.image"];
+  const customRefs = await getMediaRefs(imageKeys.map((k) => c[k]).filter(Boolean));
+  const custom = (k: string) => (c[k] ? (customRefs.find((m) => m.id === c[k]) ?? null) : null);
 
   const bySlug = (slug: string) => products.find((p) => p.slug === slug);
   const img = (p: ProductCardData | undefined, color?: string, nth = 0) => (p ? (imagesForColor(p.images, color)[nth] ?? p.images[0] ?? null) : null);
@@ -30,32 +34,32 @@ export default async function AboutPage() {
   const trousers = bySlug("korean-pleated-trousers-ivory") ?? firstOf("trousers");
   const tie = bySlug("paisley-silk-tie") ?? firstOf("accessories");
   const shoes = bySlug("italian-suede-tassel-loafers") ?? firstOf("shoes");
-  const cover = looks.find((l) => l.cover)?.cover ?? img(knit);
+  const cover = custom("about.cover") ?? looks.find((l) => l.cover)?.cover ?? img(knit);
 
   const chapters: Chapter[] = [
     {
-      latin: "Italian Cotton",
-      title: "قطن إيطالي، بلا مساومة",
-      body: "تريكونا قطني 100% ومصنوع في إيطاليا 🇮🇹 — ضفائر كلاسيكية منتظمة، وسحّاب نصفي بلمسة جلدية، وألوان مأخوذة من دفء الخريف: البورغندي، الأسود، بني القهوة والكحلي. خامة تتنفّس في الصيف وتدفّيك في الشتاء.",
-      image: img(knit, "برغندي", 1) ?? img(knit),
+      latin: c["about.ch1.latin"],
+      title: c["about.ch1.title"],
+      body: c["about.ch1.body"],
+      image: custom("about.ch1.image") ?? img(knit, "برغندي", 1) ?? img(knit),
     },
     {
-      latin: "The Korean Cut",
-      title: "القصّة الكورية… كما يجب",
-      body: "البنطال الكوري مو مجرد واسع أو ضيّق؛ هو قالب مدروس بكسرات أمامية وخصر مرتفع يسقط باستقامة على الحذاء. أخذنا وقتنا حتى ضبطنا القالب والقصّة الصحيحة، عشان يجلس عليك وكأنه مفصّل لك.",
-      image: img(trousers),
+      latin: c["about.ch2.latin"],
+      title: c["about.ch2.title"],
+      body: c["about.ch2.body"],
+      image: custom("about.ch2.image") ?? img(trousers),
     },
     {
-      latin: "Details as Signature",
-      title: "التفاصيل هي التوقيع",
-      body: "ربطة حرير بنقشة بيزلي، ياقة إيطالية حادّة تقف بثبات تحت التريكو، وشرّابة على لوفر من الشامواه الطبيعي. نختار كل تفصيلة كما يختار الخيّاط إبرته — لأن الفرق الكبير يبدأ من الأشياء الصغيرة.",
-      image: img(tie, "أحمر قرمزي"),
+      latin: c["about.ch3.latin"],
+      title: c["about.ch3.title"],
+      body: c["about.ch3.body"],
+      image: custom("about.ch3.image") ?? img(tie, "أحمر قرمزي"),
     },
     {
-      latin: "Yemeni Roots",
-      title: "جذور يمنية، وذوق عالمي",
-      body: "وُلدنا في اليمن ونعرف ما يليق بمجالسنا ومناسباتنا. نوصل لكل المحافظات، نؤكّد كل طلب بأنفسنا، وتدفع عند الاستلام — لأن الثقة عندنا جزء من الأناقة، مو أقل منها.",
-      image: img(shoes),
+      latin: c["about.ch4.latin"],
+      title: c["about.ch4.title"],
+      body: c["about.ch4.body"],
+      image: custom("about.ch4.image") ?? img(shoes),
     },
   ];
 
@@ -73,18 +77,18 @@ export default async function AboutPage() {
   for (const p of products) push(p.images[0]);
 
   const stats = [
-    { value: "+69K", label: "رجل مرموق يتابعنا على إنستغرام" },
-    { value: "100%", label: "قطن إيطالي في كل قطعة تريكو" },
-    ...(zones.length ? [{ value: String(zones.length), label: "محافظة يوصلها طلبك" }] : []),
-    { value: "3", label: "أيام لاستبدال المقاس أو اللون" },
-  ];
+    { value: c["about.stat1.value"], label: c["about.stat1.label"] },
+    { value: c["about.stat2.value"], label: c["about.stat2.label"] },
+    ...(zones.length ? [{ value: String(zones.length), label: "منطقة يوصلها طلبك" }] : []),
+    { value: c["about.stat3.value"], label: c["about.stat3.label"] },
+  ].filter((x) => x.value.trim());
 
   return (
     <>
       <PageHeader
-        eyebrow="Our Story · قصتنا"
-        title="قصة مرموق"
-        subtitle={`${settings.tagline} — ملابس رجالية راقية بتفاصيل مختارة بعناية.`}
+        eyebrow={c["about.eyebrow"]}
+        title={c["about.title"]}
+        subtitle={c["about.subtitle"]}
         media={cover}
         breadcrumbs={[{ label: "الرئيسية", href: "/" }, { label: "قصتنا" }]}
       />
@@ -98,7 +102,7 @@ export default async function AboutPage() {
               The Meaning
             </p>
             <h2 id="meaning" className="display mt-6 text-[5.5rem] leading-none text-espresso md:text-[8.5rem]">
-              مَرموق
+              {c["about.word"]}
             </h2>
             <p className="mt-4">
               <span dir="ltr" className="latin-italic text-xl text-taupe">
@@ -111,17 +115,16 @@ export default async function AboutPage() {
               <div className="flex gap-5 py-5">
                 <dt className="latin-italic w-10 shrink-0 text-2xl text-copper">1.</dt>
                 <dd className="text-lg leading-9 text-espresso">
-                  <span className="text-sm text-taupe">(صفة)</span> مَن تُرمَق إليه الأبصار إعجاباً وتقديراً.
+                  <span className="text-sm text-taupe">(صفة)</span> {c["about.def1"]}
                 </dd>
               </div>
               <div className="flex gap-5 border-t border-line py-5">
                 <dt className="latin-italic w-10 shrink-0 text-2xl text-copper">2.</dt>
-                <dd className="text-lg leading-9 text-espresso">رفيع المكانة، ذو حضور وشأن — يُعرَف قبل أن يتكلّم.</dd>
+                <dd className="text-lg leading-9 text-espresso">{c["about.def2"]}</dd>
               </div>
             </dl>
             <p className="mt-8 text-[1.05rem] leading-9 text-umber text-pretty">
-              اخترنا الاسم لأنه يختصر كل ما نريده لك: أن تدخل المجلس فتلتفت إليك الأنظار، لا لصخب ما تلبس، بل لاتّزانه. مرموق ليست ماركة تلبسها
-              فقط — هي حالة توصل لها بالتفاصيل: ياقة تقف بثبات، ضفيرة تريكو منتظمة، وخط كيّ لا ينكسر.
+              {c["about.meaning"]}
             </p>
             <p className="display mt-8 text-2xl leading-relaxed text-copper-deep md:text-3xl">{settings.tagline}.</p>
           </div>
@@ -137,7 +140,7 @@ export default async function AboutPage() {
               What We Stand For
               <span className="h-px w-6 bg-gold/70" aria-hidden />
             </p>
-            <h2 className="display mt-4 text-[2.2rem] leading-[1.2] text-espresso md:text-5xl">أربعة أشياء لا نتنازل عنها</h2>
+            <h2 className="display mt-4 text-[2.2rem] leading-[1.2] text-espresso md:text-5xl">{c["about.valuesTitle"]}</h2>
           </div>
 
           <ol className="mt-16 space-y-20 md:mt-24 md:space-y-32">
@@ -197,7 +200,7 @@ export default async function AboutPage() {
               “
             </span>
             <blockquote id="manifesto" className="display text-[2rem] leading-[1.45] text-balance md:text-6xl md:leading-[1.35]">
-              لما ذوقك يتعدّى مرحلة الفخامة… تصير مرموق.
+              {c["about.quote"]}
             </blockquote>
             <figcaption className="eyebrow mt-8 text-copper-soft">— From the Marmouq notebook</figcaption>
           </figure>
@@ -231,10 +234,10 @@ export default async function AboutPage() {
               <span className="h-px w-6 bg-gold/70" aria-hidden />
             </p>
             <h2 id="about-cta" className="display mt-4 text-[2.2rem] leading-[1.2] text-espresso text-balance md:text-5xl">
-              ابدأ من قطعة واحدة… والباقي يتبعها
+              {c["about.ctaTitle"]}
             </h2>
             <p className="mx-auto mt-4 max-w-lg text-[0.98rem] leading-8 text-umber">
-              تصفّح المجموعة، أو خلّ الأتيليه ينسّق لك طقمك كامل من التريكو حتى الحذاء.
+              {c["about.ctaText"]}
             </p>
             <div className="mt-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
               <ButtonLink href="/shop" size="lg">

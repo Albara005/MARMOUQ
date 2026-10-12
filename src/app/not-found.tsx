@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { copyOf, getSettings } from "@/lib/settings";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { ArrowLeft } from "lucide-react";
@@ -10,6 +11,7 @@ export const metadata: Metadata = {
 };
 
 export default async function NotFound() {
+  const c = copyOf(await getSettings());
   // Render per request so the chrome reflects live settings (and the DB is never touched at build time).
   await headers();
   return (
@@ -24,8 +26,8 @@ export default async function NotFound() {
         </p>
         <div className="container-luxe flex min-h-[70svh] flex-col items-center justify-center py-24 text-center">
           <p className="eyebrow">Page not found</p>
-          <h1 className="display mt-5 max-w-2xl text-4xl leading-tight text-espresso text-balance md:text-6xl">هذه الصفحة غير موجودة… لكن إطلالتك القادمة موجودة</h1>
-          <p className="mt-5 max-w-md text-[0.95rem] leading-8 text-umber">يمكن الرابط تغيّر أو القطعة انتقلت لمكان جديد. خلّنا نرجّعك للطريق الصحيح.</p>
+          <h1 className="display mt-5 max-w-2xl text-4xl leading-tight text-espresso text-balance md:text-6xl">{c["notFound.title"]}</h1>
+          <p className="mt-5 max-w-md text-[0.95rem] leading-8 text-umber">{c["notFound.text"]}</p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
             <Link href="/shop" className={buttonClasses("primary", "lg")}>
               تسوّق المجموعة

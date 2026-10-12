@@ -5,7 +5,8 @@ import { Search } from "lucide-react";
 import { and, eq, gt, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { productVariants } from "@/db/schema";
-import { getDisplayCurrency, getSettings } from "@/lib/settings";
+import { copyOf, getDisplayCurrency, getSettings } from "@/lib/settings";
+import { getMediaRefs } from "@/lib/catalog";
 import { getFilterFacets, listCategories, listLooks, listProducts, type CategoryData, type LookData, type ProductCardData } from "@/lib/catalog";
 import { PageHeader } from "@/components/store/page-header";
 import { ProductCard } from "@/components/store/product-card";
@@ -118,6 +119,8 @@ export async function ShopView({ category, params }: { category: CategoryData | 
   );
 
   const displayCurrency = await getDisplayCurrency(settings);
+  const c = copyOf(settings);
+  const shopCover = c["shop.cover"] ? ((await getMediaRefs([c["shop.cover"]]))[0] ?? null) : null;
   const panelProps = { params, base, category, categories, allCount, facets: { ...facets, sizes: orderSizes(facets.sizes) }, currency: displayCurrency };
   const crumbs = [
     { label: "الرئيسية", href: "/" },
@@ -162,9 +165,10 @@ export async function ShopView({ category, params }: { category: CategoryData | 
         />
       ) : (
         <PageHeader
-          eyebrow="The Collection"
-          title="كل القطع"
-          subtitle="تشكيلة مختصرة ومدروسة: كل قطعة هنا اخترناها لتكمّل الأخرى — من التريكو الإيطالي بالضفائر حتى اللوفر الشامواه."
+          eyebrow={c["shop.eyebrow"]}
+          title={c["shop.title"]}
+          subtitle={c["shop.subtitle"]}
+          media={shopCover}
           breadcrumbs={crumbs.slice(0, 2)}
         />
       )}

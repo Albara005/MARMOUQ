@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { useRef } from "react";
 import { ChevronLeft, Heart, Search, X } from "lucide-react";
-import { Wordmark } from "@/components/ui/wordmark";
+import { BrandLogo } from "@/components/store/brand-logo";
 import { MediaImage } from "@/components/ui/media-image";
 import { InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/ui/brand-icons";
 import { useStoreConfig } from "@/components/store/store-provider";
 import { CurrencySwitcher } from "@/components/store/currency-switcher";
 import { Portal, useModal, usePresence } from "@/components/store/overlay";
-import { NAV_LINKS, SERVICE_LINKS, categoryHref } from "@/components/store/nav";
+import { SERVICE_LINKS, categoryHref } from "@/components/store/nav";
 import type { NavCategory } from "@/components/store/header";
 import { cn, whatsappLink } from "@/lib/utils";
 
@@ -32,7 +32,8 @@ export function MobileMenu({
 
   if (!mounted) return null;
 
-  const primary = [{ href: "/shop", label: "المتجر", en: "Shop" }, ...NAV_LINKS.map((l) => ({ ...l, en: l.href === "/looks" ? "Looks" : l.href === "/atelier" ? "Atelier" : "Our Story" }))];
+  const EN: Record<string, string> = { "/looks": "Looks", "/atelier": "Atelier", "/about": "Our Story", "/contact": "Contact" };
+  const primary = [{ href: "/shop", label: "المتجر", en: "Shop" }, ...config.nav.map((l) => ({ ...l, en: EN[l.href] ?? "" }))];
   const stagger = (i: number) => ({ transitionDelay: visible ? `${140 + i * 55}ms` : "0ms" });
   const reveal = cn("transition-all duration-700 ease-[var(--ease-out-expo)]", visible ? "translate-x-0 opacity-100" : "translate-x-6 opacity-0");
 
@@ -52,7 +53,7 @@ export function MobileMenu({
           )}
         >
           <div className="flex h-16 shrink-0 items-center justify-between border-b border-line px-5">
-            <Wordmark size="sm" />
+            <BrandLogo size="sm" />
             <button type="button" onClick={onClose} className="-me-2.5 grid size-11 place-items-center rounded-full hover:bg-bone" aria-label="إغلاق القائمة">
               <X className="size-5" strokeWidth={1.5} aria-hidden />
             </button>

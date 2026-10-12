@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, Sparkles } from "lucide-react";
-import { getDisplayCurrency, getSettings } from "@/lib/settings";
+import { copyOf, getDisplayCurrency, getSettings } from "@/lib/settings";
 import { listCategories, listLooks, type LookData } from "@/lib/catalog";
 import { LookHotspots } from "@/components/store/look-hotspots";
 import { AddLookButton } from "@/components/store/add-look-dialog";
@@ -23,6 +23,7 @@ export const metadata: Metadata = {
 export default async function LooksPage() {
   const [settings, looks, categories] = await Promise.all([getSettings(), listLooks(24), listCategories()]);
   const displayCurrency = await getDisplayCurrency(settings);
+  const c = copyOf(settings);
   const ready = looks.filter((l) => l.items.length > 0);
   const maxDiscount = ready.reduce((m, l) => Math.max(m, l.discountPercent), 0);
 
@@ -53,18 +54,17 @@ export default async function LooksPage() {
             <div className="lg:col-span-8">
               <p className="eyebrow inline-flex items-center gap-3">
                 <span className="h-px w-8 bg-gold/70" aria-hidden />
-                The Lookbook · Autumn Edit
+                {c["looks.eyebrow"]}
               </p>
               <h1 className="display mt-4 text-[2.6rem] leading-[1.1] text-espresso text-balance md:text-7xl">
-                إطلالات مكتملة،
+                {c["looks.title1"]}
                 <br />
-                <span className="text-copper">من الياقة حتى الحذاء</span>
+                <span className="text-copper">{c["looks.title2"]}</span>
               </h1>
             </div>
             <div className="lg:col-span-4">
               <p className="text-[0.98rem] leading-8 text-umber text-pretty">
-                وش يمنعك تلبس كذا؟ كل إطلالة هنا منسّقة قطعة قطعة على يد فريق مرموق — اطلبها كاملة
-                {maxDiscount > 0 ? <> ووفّر حتى <strong className="font-medium text-espresso">{maxDiscount}%</strong></> : null}، أو خذ منها ما يكمّل خزانتك.
+                {c["looks.intro"]}
               </p>
               {ready.length > 1 && (
                 <ol className="mt-6 divide-y divide-line border-y border-line" aria-label="فهرس الإطلالات">
@@ -141,10 +141,10 @@ export default async function LooksPage() {
               The Atelier
             </p>
             <h2 id="looks-atelier" className="display mt-4 text-[2.2rem] leading-[1.15] text-espresso text-balance md:text-5xl">
-              ما لقيت طقمك؟ نسّقه بنفسك.
+              {c["looks.atelierTitle"]}
             </h2>
             <p className="mt-4 max-w-md text-[0.98rem] leading-8 text-umber">
-              اختر التريكو ولونه، القميص، الربطة، البنطال والحذاء — وشوف الطقم يكتمل قدّامك على طاولة الأتيليه قبل ما تطلبه.
+              {c["looks.atelierText"]}
             </p>
             <ButtonLink href="/atelier" size="lg" className="mt-8">
               <Sparkles className="size-4" aria-hidden />

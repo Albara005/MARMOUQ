@@ -19,7 +19,8 @@ export type FooterInfo = {
   address: string;
 };
 
-export function Footer({ info, categories }: { info: FooterInfo; categories: { slug: string; name: string }[] }) {
+export function Footer({ info, categories, copy = {} }: { info: FooterInfo; categories: { slug: string; name: string }[]; copy?: Record<string, string> }) {
+  const c = (k: string, d: string) => copy[k] ?? d;
   const year = new Date().getFullYear();
   const linkCls = "link-luxe inline-flex min-h-9 items-center py-1 text-[0.92rem] text-paper/70 transition-colors hover:text-paper";
 
@@ -31,12 +32,12 @@ export function Footer({ info, categories }: { info: FooterInfo; categories: { s
           <div className="md:col-span-6">
             <p className="eyebrow inline-flex items-center gap-3">
               <span className="h-px w-8 bg-gold/70" aria-hidden />
-              The Private List
+              {c("footer.listEyebrow", "The Private List")}
             </p>
             <h2 id="vip-title" className="display mt-4 text-3xl leading-tight text-espresso text-balance md:text-[2.75rem]">
-              انضم لقائمة مرموق الخاصة
+              {c("footer.listTitle", "انضم لقائمة مرموق الخاصة")}
             </h2>
-            <p className="mt-3 max-w-md text-[0.95rem] leading-8 text-umber">كن أول من يعرف بالمجموعات الجديدة والقطع المحدودة قبل نزولها على إنستغرام.</p>
+            <p className="mt-3 max-w-md text-[0.95rem] leading-8 text-umber">{c("footer.listText", "كن أول من يعرف بالمجموعات الجديدة والقطع المحدودة قبل نزولها على إنستغرام.")}</p>
           </div>
           <div className="md:col-span-6 md:ps-8 lg:ps-16">
             <NewsletterForm />
@@ -155,10 +156,10 @@ export function Footer({ info, categories }: { info: FooterInfo; categories: { s
             <p className="text-xs text-paper/50">طرق دفع مرنة تناسبك</p>
             <ul className="flex flex-wrap gap-2" aria-label="طرق الدفع المتاحة">
               {[
-                { icon: Banknote, label: "الدفع عند الاستلام" },
-                { icon: Landmark, label: "الكريمي" },
-                { icon: Wallet, label: "المحافظ الإلكترونية" },
-              ].map(({ icon: Icon, label }) => (
+                { icon: Banknote, label: c("footer.pay1", "الدفع عند الاستلام") },
+                { icon: Landmark, label: c("footer.pay2", "الكريمي") },
+                { icon: Wallet, label: c("footer.pay3", "المحافظ الإلكترونية") },
+              ].filter((x) => x.label.trim()).map(({ icon: Icon, label }) => (
                 <li key={label} className="inline-flex h-9 items-center gap-2 rounded-full border border-paper/15 px-3.5 text-xs text-paper/80">
                   <Icon className="size-3.5 text-copper-soft" strokeWidth={1.5} aria-hidden />
                   {label}

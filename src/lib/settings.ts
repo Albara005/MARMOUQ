@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { settings } from "@/db/schema";
 import { DEFAULT_CURRENCY, type Currency } from "@/lib/money";
+import { DEFAULT_NAV, resolveCopy, type NavLink } from "@/lib/copy";
 import { cookies } from "next/headers";
 
 export type PaymentAccount = { bank: string; holder: string; number: string };
@@ -82,6 +83,16 @@ export type StoreSettings = {
     announcement: { enabled: boolean; tone: BarTone; href: string; interval: number };
     marquee: { enabled: boolean; tone: BarTone; items: string[]; speed: number };
   };
+  /** Overrides for storefront texts & image ids (see src/lib/copy.ts) */
+  copy: Record<string, string>;
+  /** Header / mobile menu links (after the shop mega-menu) */
+  nav: NavLink[];
+  /** Custom FAQ on the contact page (empty = built-in answers from your settings) */
+  faq: { q: string; a: string }[];
+  /** Brand colours ("" = MARMOUQ defaults) */
+  theme: { accent: string; dark: string; background: string };
+  /** Optional logo image replacing the text wordmark */
+  brand: { logoId: string | null; logoHeight: number };
   home: {
     sections: Record<HomeSectionKey, boolean>;
     categories: { eyebrow: string; title: string; subtitle: string };
@@ -147,6 +158,11 @@ export const DEFAULT_SETTINGS: StoreSettings = {
     description: "طريقك لتكون شخصية مرموقة. ملابس رجالية راقية بتفاصيل مختارة بعناية: تريكو قطني إيطالي، قمصان، بناطيل وأحذية.",
   },
   markets: { switcher: true, defaultCode: "", currencies: [] },
+  copy: {},
+  nav: DEFAULT_NAV,
+  faq: [],
+  theme: { accent: "", dark: "", background: "" },
+  brand: { logoId: null, logoHeight: 40 },
   bars: {
     announcement: { enabled: true, tone: "espresso", href: "", interval: 5 },
     marquee: { enabled: true, tone: "ivory", items: ["قطن 100%", "صنع إيطالي 🇮🇹", "قصّات مدروسة", "توصيل لكل المحافظات", "الدفع عند الاستلام", "استبدال سهل"], speed: 38 },
@@ -212,7 +228,9 @@ export async function saveSettings(next: StoreSettings): Promise<void> {
 }
 
 /** The subset of settings that is safe and useful on the client. */
-export type PublicStoreConfig = Pick<StoreSettings, "storeName" | "storeNameEn" | "tagline" | "whatsapp" | "instagram" | "tiktok" | "freeShippingThreshold"> & {
+export type PublicStoreConfig = Pick<StoreSettings, "storeName" | "storeNameEn" | "tagline" | "whatsapp" | "instagram" | "tiktok" | "freeShippingThreshold" | "nav" | "brand"> & {
+  /** Resolved storefront copy (defaults + overrides) */
+  copy: Record<string, string>;
   /** The visitor's DISPLAY currency (converts from base). */
   currency: Currency;
   baseCurrency: Currency;
@@ -232,6 +250,9 @@ export function toPublicConfig(s: StoreSettings, display?: Currency): PublicStor
     currency: display ?? s.currency,
     baseCurrency: s.currency,
     freeShippingThreshold: s.freeShippingThreshold,
+    nav: s.nav.length ? s.nav : DEFAULT_NAV,
+    brand: s.brand,
+    copy: resolveCopy(s.copy),
     currencyOptions:
       s.markets.switcher && enabled.length
         ? [{ code: s.currency.code, symbol: s.currency.symbol, label: "العملة الأساسية" }, ...enabled.map((c) => ({ code: c.code, symbol: c.symbol, label: c.label || c.code }))]
@@ -259,4 +280,9 @@ export async function getDisplayCurrency(s?: StoreSettings): Promise<Currency> {
     code = undefined;
   }
   return resolveDisplayCurrency(settings, code);
+}
+
+/** Storefront copy for server components. */
+export function copyOf(s: StoreSettings): Record<string, string> {
+  return resolveCopy(s.copy);
 }

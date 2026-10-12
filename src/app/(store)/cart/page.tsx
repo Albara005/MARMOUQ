@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { copyOf, getSettings } from "@/lib/settings";
 import { listProducts, type ProductCardData } from "@/lib/catalog";
 import { PageHeader } from "@/components/store/page-header";
 import { CartView } from "@/components/store/checkout/cart-view";
@@ -25,13 +26,14 @@ async function loadSuggestions(): Promise<ProductCardData[]> {
 }
 
 export default async function CartPage() {
+  const c = copyOf(await getSettings());
   const suggestions = await loadSuggestions();
   return (
     <>
       <PageHeader
         eyebrow="SHOPPING BAG"
-        title="سلّة التسوق"
-        subtitle="راجع قطعك قبل الإتمام — يمكنك تعديل الكمية أو المقاس في أي وقت، ونؤكد معك كل التفاصيل قبل الشحن."
+        title={c["cart.title"]}
+        subtitle={c["cart.subtitle"]}
         breadcrumbs={[{ label: "الرئيسية", href: "/" }, { label: "سلّة التسوق" }]}
         className="[&>div:first-child]:pb-8 md:[&>div:first-child]:pb-10"
       />

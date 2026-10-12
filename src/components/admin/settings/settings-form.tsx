@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Coins, CreditCard, FileText, Globe, House, Megaphone, Plus, Search, Store, Truck, CircleAlert } from "lucide-react";
+import { Coins, CreditCard, ExternalLink, FileText, Globe, House, LayoutTemplate, Megaphone, Palette, Plus, Search, Store, Truck, CircleAlert } from "lucide-react";
 import type { BarTone, HomeSectionKey, MarketCurrency, StoreSettings } from "@/lib/settings";
 import type { MediaLike } from "@/components/ui/media-image";
 import { formatMoney, type Currency } from "@/lib/money";
@@ -11,11 +11,14 @@ import { ActionFieldError, ActionForm, ActionFormError, SubmitButton, useActionF
 import { ImageUploader } from "@/components/admin/image-uploader";
 import { saveSettingsAction } from "@/app/admin/(panel)/settings/actions";
 import { ListEditor } from "./list-editors";
+import { COPY_GROUPS } from "@/lib/copy";
 
-type TabId = "identity" | "home" | "bars" | "markets" | "payments" | "shipping" | "policies" | "seo";
+type TabId = "identity" | "brand" | "home" | "pages" | "bars" | "markets" | "payments" | "shipping" | "policies" | "seo";
 const TABS: { id: TabId; label: string; icon: typeof Store; prefixes: string[] }[] = [
   { id: "identity", label: "الهوية والتواصل", icon: Store, prefixes: ["storeName", "storeNameEn", "tagline", "description", "whatsapp", "phone", "email", "instagram", "tiktok", "address", "workingHours"] },
+  { id: "brand", label: "الهوية البصرية", icon: Palette, prefixes: ["theme", "brand", "nav"] },
   { id: "home", label: "الواجهة الرئيسية", icon: House, prefixes: ["hero", "testimonials", "home"] },
+  { id: "pages", label: "صفحات المتجر", icon: LayoutTemplate, prefixes: ["copy", "faq"] },
   { id: "bars", label: "الأشرطة الإعلانية", icon: Megaphone, prefixes: ["bars", "announcements"] },
   { id: "markets", label: "العملات والأسواق", icon: Coins, prefixes: ["markets"] },
   { id: "payments", label: "المدفوعات", icon: CreditCard, prefixes: ["payments"] },
@@ -116,6 +119,9 @@ export function SettingsForm({
       )}
     </div>
   );
+  const setCopy = (key: string, value: string) => setS((p) => ({ ...p, copy: { ...p.copy, [key]: value } }));
+  const setTheme = (patch: Partial<StoreSettings["theme"]>) => setS((p) => ({ ...p, theme: { ...p.theme, ...patch } }));
+  const setBrand = (patch: Partial<StoreSettings["brand"]>) => setS((p) => ({ ...p, brand: { ...p.brand, ...patch } }));
   const setBar = <K extends "announcement" | "marquee">(k: K, patch: Partial<StoreSettings["bars"][K]>) =>
     setS((p) => ({ ...p, bars: { ...p.bars, [k]: { ...p.bars[k], ...patch } } }));
   const setPay = (k: "cod" | "transfer", patch: Partial<StoreSettings["payments"]["transfer"]>) =>
@@ -701,6 +707,137 @@ export function SettingsForm({
               />
             </Section>
 
+          </div>
+
+          <div role="tabpanel" id="panel-brand" aria-labelledby="tab-brand" hidden={tab !== "brand"} className="space-y-5">
+            <Section title="الشعار" description="ارفع شعارك (يفضّل PNG بخلفية شفافة) ليظهر بدل الاسم المكتوب أعلى المتجر.">
+              <div className="grid gap-5 md:grid-cols-2">
+                <ImageUploader
+                  value={s.brand.logoId ? [{ id: s.brand.logoId }] : []}
+                  onChange={(v) => setBrand({ logoId: v[0]?.id ?? null })}
+                  multiple={false}
+                  label="صورة الشعار"
+                  hint="اتركها فارغة لاستخدام الاسم MARMOUQ المكتوب."
+                />
+                <F label={`ارتفاع الشعار: ${s.brand.logoHeight}px`} name="brand.logoHeight">
+                  <input id="s-brand.logoHeight" type="range" min={20} max={96} step={2} value={s.brand.logoHeight} onChange={(e) => setBrand({ logoHeight: Number(e.target.value) })} className="w-full accent-copper" />
+                </F>
+              </div>
+            </Section>
+
+            <Section title="ألوان المتجر" description="غيّر ألوان الهوية — تُطبَّق على كل صفحات المتجر. اتركها فارغة لألوان مرموق الأصلية.">
+              <div className="grid gap-4 sm:grid-cols-3">
+                {(
+                  [
+                    ["accent", "اللون المميز (الأزرار والتفاصيل)", "#a9643a"],
+                    ["dark", "اللون الداكن (النصوص والخلفيات الداكنة)", "#1c130f"],
+                    ["background", "لون الخلفية", "#f7f3ee"],
+                  ] as const
+                ).map(([k, label, def]) => (
+                  <F key={k} label={label} name={`theme.${k}`}>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id={`s-theme.${k}`}
+                        type="color"
+                        value={s.theme[k] || def}
+                        onChange={(e) => setTheme({ [k]: e.target.value } as Partial<StoreSettings["theme"]>)}
+                        className="size-11 cursor-pointer rounded-lg border border-line bg-paper p-1"
+                      />
+                      <Input dir="ltr" className="h-11 flex-1 font-mono text-sm" value={s.theme[k]} placeholder={def} onChange={(e) => setTheme({ [k]: e.target.value.trim() } as Partial<StoreSettings["theme"]>)} />
+                      {s.theme[k] && (
+                        <button type="button" onClick={() => setTheme({ [k]: "" } as Partial<StoreSettings["theme"]>)} className="h-11 shrink-0 rounded-full px-3 text-xs text-taupe hover:bg-bone">
+                          الأصلي
+                        </button>
+                      )}
+                    </div>
+                  </F>
+                ))}
+              </div>
+            </Section>
+
+            <Section title="روابط القائمة العلوية" description="تظهر بعد «المتجر» في أعلى الموقع وفي قائمة الجوال.">
+              <ListEditor
+                items={s.nav}
+                onChange={(nav) => setS((p) => ({ ...p, nav }))}
+                create={() => ({ label: "", href: "/" })}
+                max={8}
+                addLabel="إضافة رابط"
+                emptyLabel="لا روابط — تظهر روابط مرموق الافتراضية."
+                itemLabel={(i) => `الرابط ${i + 1}`}
+                render={(l, update, i) => (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Input aria-label="اسم الرابط" className="h-10 text-sm" value={l.label} onChange={(e) => update({ ...l, label: e.target.value })} placeholder="الإطلالات" />
+                      <ActionFieldError name={`nav.${i}.label`} />
+                    </div>
+                    <div>
+                      <Input aria-label="الرابط" dir="ltr" className="h-10 text-sm" value={l.href} onChange={(e) => update({ ...l, href: e.target.value })} placeholder="/looks" style={{ textAlign: "right" }} />
+                      <ActionFieldError name={`nav.${i}.href`} />
+                    </div>
+                  </div>
+                )}
+              />
+            </Section>
+          </div>
+
+          <div role="tabpanel" id="panel-pages" aria-labelledby="tab-pages" hidden={tab !== "pages"} className="space-y-5">
+            {COPY_GROUPS.map((g) => (
+              <Section
+                key={g.id}
+                title={g.label}
+                aside={
+                  g.href ? (
+                    <a href={g.href} target="_blank" rel="noreferrer" className="inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs text-taupe hover:bg-bone hover:text-espresso">
+                      عرض الصفحة <ExternalLink className="size-3.5" aria-hidden />
+                    </a>
+                  ) : undefined
+                }
+              >
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {g.fields.map((f) =>
+                    f.type === "image" ? (
+                      <div key={f.key} className="sm:col-span-2 md:col-span-1">
+                        <ImageUploader
+                          value={s.copy[f.key] ? [{ id: s.copy[f.key] }] : []}
+                          onChange={(v) => setCopy(f.key, v[0]?.id ?? "")}
+                          multiple={false}
+                          label={f.label}
+                          hint={f.hint ?? "اتركها فارغة لاستخدام صورة تلقائية من منتجاتك."}
+                        />
+                      </div>
+                    ) : (
+                      <F key={f.key} label={f.label} name={`copy.${f.key}`} hint={f.hint} className={f.type === "textarea" ? "sm:col-span-2" : undefined}>
+                        {f.type === "textarea" ? (
+                          <Textarea id={`s-copy.${f.key}`} rows={3} value={s.copy[f.key] ?? f.def} onChange={(e) => setCopy(f.key, e.target.value)} />
+                        ) : (
+                          <Input id={`s-copy.${f.key}`} className={inputSm} value={s.copy[f.key] ?? f.def} onChange={(e) => setCopy(f.key, e.target.value)} />
+                        )}
+                      </F>
+                    ),
+                  )}
+                </div>
+              </Section>
+            ))}
+
+            <Section title="الأسئلة الشائعة (صفحة تواصل معنا)" description="إن تركتها فارغة تظهر إجابات تلقائية مبنية على إعدادات الشحن والدفع.">
+              <ListEditor
+                items={s.faq}
+                onChange={(faq) => setS((p) => ({ ...p, faq }))}
+                create={() => ({ q: "", a: "" })}
+                max={20}
+                addLabel="إضافة سؤال"
+                emptyLabel="تُستخدم الأسئلة التلقائية."
+                itemLabel={(i) => `السؤال ${i + 1}`}
+                render={(f, update, i) => (
+                  <div className="grid gap-2">
+                    <Input aria-label="السؤال" className="h-10 text-sm" value={f.q} onChange={(e) => update({ ...f, q: e.target.value })} placeholder="كم يأخذ التوصيل؟" />
+                    <ActionFieldError name={`faq.${i}.q`} />
+                    <Textarea aria-label="الإجابة" rows={2} className="min-h-0 text-sm" value={f.a} onChange={(e) => update({ ...f, a: e.target.value })} />
+                    <ActionFieldError name={`faq.${i}.a`} />
+                  </div>
+                )}
+              />
+            </Section>
           </div>
 
           <div role="tabpanel" id="panel-markets" aria-labelledby="tab-markets" hidden={tab !== "markets"} className="space-y-5">

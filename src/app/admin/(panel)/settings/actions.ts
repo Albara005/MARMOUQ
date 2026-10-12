@@ -8,6 +8,7 @@ import { media } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
 import { getSettings, saveSettings, type StoreSettings } from "@/lib/settings";
 import { normalizePhone } from "@/lib/utils";
+import { COPY_GROUPS } from "@/lib/copy";
 import { actionError, actionOk, zodFieldErrors, type ActionResult } from "@/components/admin/action-result";
 
 const text = (max: number, msg = `الحد الأقصى ${max} حرفاً`) => z.string().trim().max(max, msg);
@@ -39,6 +40,8 @@ const href = z
   .trim()
   .max(200)
   .refine((v) => /^\/[^\s]*$/.test(v) || /^https:\/\/[^\s]+$/i.test(v), "ابدأ الرابط بـ / لصفحة داخلية أو https://");
+
+const HEX_OR_EMPTY = z.union([z.literal(""), z.string().regex(/^#[0-9a-fA-F]{6}$/, "لون غير صالح")]);
 
 const TONE = z.enum(["espresso", "copper", "burgundy", "navy", "ivory"]);
 
@@ -142,6 +145,17 @@ const settingsSchema = z
         speed: z.coerce.number().int().min(10, "10 ثوانٍ على الأقل").max(120, "120 ثانية كحد أقصى"),
       }),
     }),
+    copy: z.record(z.string().max(80), z.string().max(4000, "النص طويل جداً")).refine((r) => Object.keys(r).length <= 400, "عدد الحقول كبير"),
+    nav: z.array(z.object({ label: required(1, 30, "اسم الرابط مطلوب"), href })).max(8, "8 روابط كحد أقصى"),
+    faq: z.array(z.object({ q: required(3, 160, "اكتب السؤال"), a: required(3, 1500, "اكتب الإجابة") })).max(20, "20 سؤالاً كحد أقصى"),
+    theme: z.object({ accent: HEX_OR_EMPTY, dark: HEX_OR_EMPTY, background: HEX_OR_EMPTY }),
+    brand: z.object({
+      logoId: z
+        .string()
+        .regex(/^[a-f0-9]{8,64}$/)
+        .nullable(),
+      logoHeight: z.coerce.number().int().min(20).max(96),
+    }),
     home: z.object({
       sections: z.object({
         categories: z.boolean(),
@@ -202,6 +216,16 @@ export async function saveSettingsAction(_prev: ActionResult, formData: FormData
     if (v.hero.mediaId && !found.some((f) => f.id === v.hero.mediaId)) return actionError("صورة الواجهة غير موجودة", { "hero.mediaId": "ارفع الصورة من جديد" });
     if (v.hero.mobileMediaId && !found.some((f) => f.id === v.hero.mobileMediaId)) return actionError("صورة الجوال غير موجودة", { "hero.mobileMediaId": "ارفع الصورة من جديد" });
   }
+
+  const copy: Record<string, string> = {};
+  for (const g of COPY_GROUPS)
+    for (const f of g.fields) {
+      const val = (v.copy[f.key] ?? "").trim();
+      if (!val || val === f.def) continue;
+      if (f.type === "image" && !/^[a-f0-9]{8,64}$/.test(val)) continue;
+      copy[f.key] = val;
+    }
+  v.copy = copy;
 
   const current = await getSettings();
   const next: StoreSettings = {

@@ -425,10 +425,10 @@ export function ProductExperience({
 
           <ul className="mt-7 grid grid-cols-3 divide-x divide-line rounded-2xl border border-line bg-paper text-center">
             {[
-              { icon: Truck, label: "توصيل لكل المحافظات" },
-              { icon: HandCoins, label: "الدفع عند الاستلام" },
-              { icon: RefreshCcw, label: "استبدال خلال 3 أيام" },
-            ].map(({ icon: Icon, label }) => (
+              { icon: Truck, label: config.copy["product.trust1"] },
+              { icon: HandCoins, label: config.copy["product.trust2"] },
+              { icon: RefreshCcw, label: config.copy["product.trust3"] },
+            ].filter((x) => x.label?.trim()).map(({ icon: Icon, label }) => (
               <li key={label} className="flex flex-col items-center gap-2 px-2 py-4">
                 <Icon className="size-5 text-copper" strokeWidth={1.4} aria-hidden />
                 <span className="text-[0.72rem] leading-5 text-umber">{label}</span>
