@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, Plus } from "lucide-react";
 import { MediaImage } from "@/components/ui/media-image";
 import type { MediaRef } from "@/lib/catalog";
+import { ScriptSafe } from "@/components/ui/script-safe";
 
 export type AtelierSlot = { label: string; media: MediaRef | null };
 
@@ -25,7 +26,7 @@ export function AtelierBand({
         <div data-reveal className="flex flex-col items-center">
           <p className="eyebrow inline-flex items-center gap-3 text-copper-soft">
             <span className="h-px w-6 bg-copper-soft/60" aria-hidden />
-            {copy.eyebrow}
+            <ScriptSafe text={copy.eyebrow} />
             <span className="h-px w-6 bg-copper-soft/60" aria-hidden />
           </p>
           <h2 id="atelier-title" className="display mt-5 max-w-3xl text-[2.4rem] leading-[1.12] text-balance md:text-6xl">

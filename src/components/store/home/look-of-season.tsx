@@ -6,6 +6,7 @@ import { LookHotspots } from "@/components/store/look-hotspots";
 import { AddLookButton } from "@/components/store/add-look-dialog";
 import { imagesForColor } from "@/lib/product-images";
 import type { LookData } from "@/lib/catalog";
+import { ScriptSafe } from "@/components/ui/script-safe";
 
 export function LookOfSeason({ look, eyebrow = "Look of the Season" }: { look: LookData; eyebrow?: string }) {
   if (look.items.length === 0) return null;
@@ -22,7 +23,7 @@ export function LookOfSeason({ look, eyebrow = "Look of the Season" }: { look: L
         <div className="lg:col-span-6" data-reveal style={{ "--reveal-delay": "120ms" } as React.CSSProperties}>
           <p className="eyebrow inline-flex items-center gap-3">
             <span className="h-px w-8 bg-gold/70" aria-hidden />
-            {eyebrow}
+            <ScriptSafe text={eyebrow} />
           </p>
           <h2 id="look-title" className="display mt-4 text-[2.4rem] leading-[1.12] text-espresso text-balance md:text-6xl">
             {look.title}

@@ -19,6 +19,8 @@ export type TemplateInput = {
   instagramHandle: string | null;
   transferAccounts: { bank: string; holder: string; number: string }[];
   eta: string | null;
+  /** courier & tracking number, once the parcel is handed over */
+  shipment?: { carrierName: string; trackingNumber: string; trackingUrl: string } | null;
 };
 
 export function orderTemplates(o: TemplateInput): { templates: WhatsAppTemplate[]; initialId: string } {
@@ -45,8 +47,10 @@ export function orderTemplates(o: TemplateInput): { templates: WhatsAppTemplate[
       id: "shipped",
       label: "تم الشحن",
       text:
-        `بشارة يا ${first} 🚚\nطلبك ${o.number} خرج للتوصيل إلى ${o.city}${o.eta ? ` ويوصلك خلال ${o.eta}` : ""}.\n` +
+        `بشارة يا ${first} 🚚\nطلبك ${o.number} خرج للتوصيل إلى ${o.city}${o.shipment?.carrierName ? ` مع ${o.shipment.carrierName}` : ""}${o.eta ? ` ويوصلك خلال ${o.eta}` : ""}.\n` +
+        (o.shipment?.trackingNumber ? `رقم الشحنة: ${o.shipment.trackingNumber}\n` : "") +
         (unpaid && o.paymentMethod === "cod" ? `المبلغ المطلوب عند الاستلام: ${o.totalLabel}\n` : "") +
+        (o.shipment?.trackingUrl ? `\nتتبّع شحنتك لدى شركة الشحن:\n${o.shipment.trackingUrl}\n` : "") +
         `\nتابع حالة طلبك من هنا:\n${o.trackUrl}${sign}`,
     },
     {

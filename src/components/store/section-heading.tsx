@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ScriptSafe } from "@/components/ui/script-safe";
 
 /**
  * Editorial section heading: latin eyebrow with a gold rule, confident Arabic display title,
@@ -49,7 +50,7 @@ export function SectionHeading({
         {eyebrow && (
           <p className={cn("eyebrow inline-flex items-center gap-3", light && "text-copper-soft")}>
             <span className="h-px w-6 bg-gold/70" aria-hidden />
-            {eyebrow}
+            <ScriptSafe text={eyebrow} />
             <span className="h-px w-6 bg-gold/70" aria-hidden />
           </p>
         )}
@@ -68,7 +69,7 @@ export function SectionHeading({
         {eyebrow && (
           <p className={cn("eyebrow inline-flex items-center gap-3", light && "text-copper-soft")}>
             <span className="h-px w-8 bg-gold/70" aria-hidden />
-            {eyebrow}
+            <ScriptSafe text={eyebrow} />
           </p>
         )}
         <Tag id={id} className={cn("display mt-4 text-[2rem] leading-[1.2] text-balance md:text-5xl", light ? "text-paper" : "text-espresso")}>

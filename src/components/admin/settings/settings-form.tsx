@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Coins, CreditCard, ExternalLink, FileText, Globe, House, LayoutTemplate, Megaphone, Palette, Plus, Search, Store, Truck, CircleAlert } from "lucide-react";
+import { ArrowLeft, Blocks, Coins, CreditCard, ExternalLink, FileText, Globe, House, LayoutTemplate, Megaphone, Palette, Plus, Search, Store, Truck, CircleAlert } from "lucide-react";
 import type { BarTone, HomeSectionKey, MarketCurrency, StoreSettings } from "@/lib/settings";
 import type { MediaLike } from "@/components/ui/media-image";
 import { formatMoney, type Currency } from "@/lib/money";
@@ -11,18 +11,23 @@ import { ActionFieldError, ActionForm, ActionFormError, SubmitButton, useActionF
 import { ImageUploader } from "@/components/admin/image-uploader";
 import { saveSettingsAction } from "@/app/admin/(panel)/settings/actions";
 import { ListEditor } from "./list-editors";
-import { COPY_GROUPS } from "@/lib/copy";
+import { SectionsEditor, setBuiltinEnabled } from "./sections-editor";
+import type { SectionsCatalog } from "./block-meta";
+import { resolveHomeLayout } from "@/lib/blocks";
+import { COPY_GROUPS, DEFAULT_NAV, type NavLink } from "@/lib/copy";
+import { CARRIER_PRESETS, TRACKING_PLACEHOLDER, buildTrackingUrl, newCarrierId, type Carrier } from "@/lib/carriers";
 
-type TabId = "identity" | "brand" | "home" | "pages" | "bars" | "markets" | "payments" | "shipping" | "policies" | "seo";
+type TabId = "identity" | "brand" | "home" | "sections" | "pages" | "bars" | "markets" | "payments" | "shipping" | "policies" | "seo";
 const TABS: { id: TabId; label: string; icon: typeof Store; prefixes: string[] }[] = [
   { id: "identity", label: "الهوية والتواصل", icon: Store, prefixes: ["storeName", "storeNameEn", "tagline", "description", "whatsapp", "phone", "email", "instagram", "tiktok", "address", "workingHours"] },
   { id: "brand", label: "الهوية البصرية", icon: Palette, prefixes: ["theme", "brand", "nav"] },
   { id: "home", label: "الواجهة الرئيسية", icon: House, prefixes: ["hero", "testimonials", "home"] },
+  { id: "sections", label: "الأقسام والصفحات", icon: Blocks, prefixes: ["layouts", "customPages"] },
   { id: "pages", label: "صفحات المتجر", icon: LayoutTemplate, prefixes: ["copy", "faq"] },
   { id: "bars", label: "الأشرطة الإعلانية", icon: Megaphone, prefixes: ["bars", "announcements"] },
   { id: "markets", label: "العملات والأسواق", icon: Coins, prefixes: ["markets"] },
   { id: "payments", label: "المدفوعات", icon: CreditCard, prefixes: ["payments"] },
-  { id: "shipping", label: "الشحن والعملة", icon: Truck, prefixes: ["currency", "freeShippingThreshold", "lowStockThreshold"] },
+  { id: "shipping", label: "الشحن والعملة", icon: Truck, prefixes: ["currency", "freeShippingThreshold", "lowStockThreshold", "carriers"] },
   { id: "policies", label: "السياسات", icon: FileText, prefixes: ["policies"] },
   { id: "seo", label: "محركات البحث", icon: Globe, prefixes: ["seo"] },
 ];
@@ -46,9 +51,9 @@ function F({ label, name, hint, children, className }: { label: ReactNode; name:
   );
 }
 
-function Section({ title, description, children, aside }: { title: string; description?: string; children: ReactNode; aside?: ReactNode }) {
+function Section({ title, description, children, aside, id }: { title: string; description?: string; children: ReactNode; aside?: ReactNode; id?: string }) {
   return (
-    <section className="rounded-2xl border border-line bg-paper p-5 shadow-[0_1px_2px_rgba(28,19,15,0.04)] md:p-6">
+    <section id={id} className="scroll-mt-24 rounded-2xl border border-line bg-paper p-5 shadow-[0_1px_2px_rgba(28,19,15,0.04)] md:p-6">
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-[0.98rem] font-semibold text-espresso">{title}</h3>
@@ -62,6 +67,8 @@ function Section({ title, description, children, aside }: { title: string; descr
 }
 
 const inputSm = "h-11";
+const NAV_MAX = 8;
+const EMPTY_CATALOG: SectionsCatalog = { products: [], categories: [], looks: [] };
 
 export function SettingsForm({
   initial,
@@ -69,6 +76,7 @@ export function SettingsForm({
   mobileHeroMedia = null,
   productOptions = [],
   lookOptions = [],
+  catalog = EMPTY_CATALOG,
   initialTab,
 }: {
   initial: StoreSettings;
@@ -76,6 +84,8 @@ export function SettingsForm({
   mobileHeroMedia?: MediaLike | null;
   productOptions?: { slug: string; name: string }[];
   lookOptions?: { slug: string; title: string }[];
+  /** products / categories / looks offered by the section builder */
+  catalog?: SectionsCatalog;
   initialTab: string;
 }) {
   const [s, setS] = useState<StoreSettings>(initial);
@@ -102,8 +112,18 @@ export function SettingsForm({
   const setIn = <K extends "hero" | "currency" | "policies" | "seo">(k: K, patch: Partial<StoreSettings[K]>) => setS((p) => ({ ...p, [k]: { ...p[k], ...patch } }));
   const setHome = <K extends Exclude<keyof StoreSettings["home"], "sections">>(k: K, patch: Partial<StoreSettings["home"][K]>) =>
     setS((p) => ({ ...p, home: { ...p.home, [k]: { ...p.home[k], ...patch } } }));
-  const toggleSection = (k: HomeSectionKey, on: boolean) => setS((p) => ({ ...p, home: { ...p.home, sections: { ...p.home.sections, [k]: on } } }));
-  const sectionSwitch = (k: HomeSectionKey) => <Switch checked={s.home.sections[k]} onChange={(e) => toggleSection(k, e.target.checked)} label="ظاهر" />;
+  // The home layout (tab «الأقسام والصفحات») is the source of truth for which original sections show;
+  // these switches drive it too, and keep the legacy flags in step for un-customised layouts.
+  const homeLayout = resolveHomeLayout(s.layouts, s.home.sections);
+  const toggleSection = (k: HomeSectionKey, on: boolean) =>
+    setS((p) => ({
+      ...p,
+      layouts: Array.isArray(p.layouts?.home) ? { ...p.layouts, home: setBuiltinEnabled(p.layouts.home, k, on) } : p.layouts,
+      home: { ...p.home, sections: { ...p.home.sections, [k]: on } },
+    }));
+  const sectionSwitch = (k: HomeSectionKey) => (
+    <Switch checked={homeLayout.some((b) => b.type === "builtin" && b.key === k && b.enabled)} onChange={(e) => toggleSection(k, e.target.checked)} label="ظاهر" />
+  );
   const copyFields = (k: "categories" | "newArrivals" | "craft", hasSubtitle = true) => (
     <div className="grid gap-3 sm:grid-cols-2">
       <F label="العنوان الصغير (فوق العنوان)" name={`home.${k}.eyebrow`}>
@@ -126,6 +146,20 @@ export function SettingsForm({
     setS((p) => ({ ...p, bars: { ...p.bars, [k]: { ...p.bars[k], ...patch } } }));
   const setPay = (k: "cod" | "transfer", patch: Partial<StoreSettings["payments"]["transfer"]>) =>
     setS((p) => ({ ...p, payments: { ...p.payments, [k]: { ...p.payments[k], ...patch } } }));
+  /** Appends a header link (an empty list means the defaults are showing — keep them). */
+  const addToNav = (link: NavLink) =>
+    setS((p) => {
+      const base = p.nav.length ? p.nav : DEFAULT_NAV;
+      if (base.some((l) => l.href === link.href) || base.length >= NAV_MAX) return p;
+      return { ...p, nav: [...base, link] };
+    });
+  const goToTab = (t: TabId, anchor?: string) => {
+    setTab(t);
+    requestAnimationFrame(() => {
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      (anchor ? document.getElementById(anchor) : topRef.current)?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+    });
+  };
 
   const errTabs = new Set(Object.keys(errors).map(tabOf).filter(Boolean) as TabId[]);
   const money = (n: number) => formatMoney(n, s.currency);
@@ -332,11 +366,23 @@ export function SettingsForm({
               </div>
             </Section>
 
-            <Section title="شبكة الأقسام" description="صور الأقسام نفسها تُغيَّر من صفحة «التصنيفات»." aside={sectionSwitch("categories")}>
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-2xl border border-copper/20 bg-copper/[0.05] px-5 py-3.5">
+              <p className="text-[0.82rem] leading-relaxed text-umber">ترتيب أقسام الصفحة الرئيسية وإضافة أقسام جديدة (بانرات، منتجات، فيديو…) من تبويب «الأقسام والصفحات».</p>
+              <button
+                type="button"
+                onClick={() => goToTab("sections")}
+                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-paper px-4 text-[0.8rem] font-medium text-espresso ring-1 ring-line transition-colors hover:bg-espresso hover:text-paper"
+              >
+                إظهار وترتيب الأقسام
+                <ArrowLeft className="size-3.5" aria-hidden />
+              </button>
+            </div>
+
+            <Section title="شبكة الأقسام" description="صور الأقسام نفسها تُغيَّر من صفحة «التصنيفات»." id="home-section-categories" aside={sectionSwitch("categories")}>
               {copyFields("categories")}
             </Section>
 
-            <Section title="قصة الألوان" description="قسم تفاعلي يغيّر لون الخلفية مع كل لون للمنتج المختار." aside={sectionSwitch("colourStory")}>
+            <Section title="قصة الألوان" description="قسم تفاعلي يغيّر لون الخلفية مع كل لون للمنتج المختار." id="home-section-colourStory" aside={sectionSwitch("colourStory")}>
               <div className="grid gap-3 sm:grid-cols-3">
                 <F label="العنوان الصغير" name="home.colourStory.eyebrow">
                   <Input id="s-home.colourStory.eyebrow" className={inputSm} value={s.home.colourStory.eyebrow} onChange={(e) => setHome("colourStory", { eyebrow: e.target.value })} />
@@ -357,7 +403,7 @@ export function SettingsForm({
               </div>
             </Section>
 
-            <Section title="وصل حديثاً" aside={sectionSwitch("newArrivals")}>
+            <Section title="وصل حديثاً" id="home-section-newArrivals" aside={sectionSwitch("newArrivals")}>
               {copyFields("newArrivals")}
               <F label="المنتجات المعروضة" name="home.newArrivals.source" className="mt-3 sm:w-1/2">
                 <Select id="s-home.newArrivals.source" className={inputSm} value={s.home.newArrivals.source} onChange={(e) => setHome("newArrivals", { source: e.target.value as "newest" | "featured" | "all" })}>
@@ -368,7 +414,7 @@ export function SettingsForm({
               </F>
             </Section>
 
-            <Section title="إطلالة الموسم" description="تُعدَّل صورة الإطلالة ونقاطها من صفحة «الإطلالات»." aside={sectionSwitch("look")}>
+            <Section title="إطلالة الموسم" description="تُعدَّل صورة الإطلالة ونقاطها من صفحة «الإطلالات»." id="home-section-look" aside={sectionSwitch("look")}>
               <div className="grid gap-3 sm:grid-cols-2">
                 <F label="العنوان الصغير" name="home.look.eyebrow">
                   <Input id="s-home.look.eyebrow" className={inputSm} value={s.home.look.eyebrow} onChange={(e) => setHome("look", { eyebrow: e.target.value })} />
@@ -386,7 +432,7 @@ export function SettingsForm({
               </div>
             </Section>
 
-            <Section title="تفاصيل مختارة بعناية" aside={sectionSwitch("craft")}>
+            <Section title="تفاصيل مختارة بعناية" id="home-section-craft" aside={sectionSwitch("craft")}>
               {copyFields("craft")}
               <div className="mt-4">
                 <ListEditor
@@ -408,7 +454,7 @@ export function SettingsForm({
               </div>
             </Section>
 
-            <Section title="المتابعون وآراء العملاء" description="الشهادات نفسها تُعدَّل في القسم التالي." aside={sectionSwitch("social")}>
+            <Section title="المتابعون وآراء العملاء" description="الشهادات نفسها تُعدَّل في القسم التالي." id="home-section-social" aside={sectionSwitch("social")}>
               <div className="grid gap-3 sm:grid-cols-3">
                 <F label="العنوان الصغير" name="home.social.eyebrow">
                   <Input id="s-home.social.eyebrow" className={inputSm} value={s.home.social.eyebrow} onChange={(e) => setHome("social", { eyebrow: e.target.value })} />
@@ -425,7 +471,7 @@ export function SettingsForm({
               </div>
             </Section>
 
-            <Section title="دعوة منسّق الإطلالة" aside={sectionSwitch("atelier")}>
+            <Section title="دعوة منسّق الإطلالة" id="home-section-atelier" aside={sectionSwitch("atelier")}>
               <div className="grid gap-3 sm:grid-cols-2">
                 <F label="العنوان الصغير" name="home.atelier.eyebrow">
                   <Input id="s-home.atelier.eyebrow" className={inputSm} value={s.home.atelier.eyebrow} onChange={(e) => setHome("atelier", { eyebrow: e.target.value })} />
@@ -471,6 +517,23 @@ export function SettingsForm({
                 )}
               />
             </Section>
+          </div>
+
+          {/* ── Sections & pages (block builder) ── */}
+          <div role="tabpanel" id="panel-sections" aria-labelledby="tab-sections" hidden={tab !== "sections"}>
+            <SectionsEditor
+              layouts={s.layouts ?? {}}
+              customPages={s.customPages ?? []}
+              onLayoutsChange={(v) => setS((p) => ({ ...p, layouts: typeof v === "function" ? v(p.layouts ?? {}) : v }))}
+              onCustomPagesChange={(v) => setS((p) => ({ ...p, customPages: typeof v === "function" ? v(p.customPages ?? []) : v }))}
+              catalog={catalog}
+              homeSections={s.home.sections}
+              nav={s.nav.length ? s.nav : DEFAULT_NAV}
+              onAddToNav={addToNav}
+              onNavChange={(fn) => setS((p) => ({ ...p, nav: fn(p.nav) }))}
+              onNavigate={goToTab}
+              marqueeOn={s.bars.marquee.enabled && s.bars.marquee.items.length > 0}
+            />
           </div>
 
           {/* ── Payments ── */}
@@ -574,6 +637,91 @@ export function SettingsForm({
                 </F>
               </div>
             </Section>
+            <Section
+              title="شركات الشحن وروابط التتبع"
+              description="أضف الشركات اللي تتعامل معها. عند شحن أي طلب تختار الشركة وتكتب رقم البوليصة، فيظهر للعميل زر «تتبّع شحنتك» يفتح صفحة الشركة مباشرة."
+            >
+              <div className="space-y-4">
+                <ListEditor
+                  items={s.carriers}
+                  onChange={(carriers) => set("carriers", carriers)}
+                  create={(): Carrier => ({ id: newCarrierId(), name: "", trackingUrl: "", phone: "", enabled: true })}
+                  max={12}
+                  addLabel="إضافة شركة شحن"
+                  emptyLabel="لم تُضف شركات شحن بعد — اختر من الشركات الجاهزة بالأسفل أو أضف شركتك."
+                  itemLabel={(i) => s.carriers[i]?.name || `الشركة ${i + 1}`}
+                  render={(c, update, i) => {
+                    const sample = buildTrackingUrl(c.trackingUrl, "1234567890");
+                    return (
+                      <div className="grid gap-2 sm:grid-cols-[1fr_1fr]">
+                        <div>
+                          <Input aria-label="اسم الشركة" className="h-10 text-sm" value={c.name} onChange={(e) => update({ ...c, name: e.target.value })} placeholder="اسم شركة الشحن" />
+                          <ActionFieldError name={`carriers.${i}.name`} />
+                        </div>
+                        <div>
+                          <Input aria-label="رقم الشركة (واتساب أو اتصال)" className="h-10 text-sm" dir="ltr" style={{ textAlign: "right" }} value={c.phone} onChange={(e) => update({ ...c, phone: e.target.value })} placeholder="رقم الشركة — اختياري" />
+                          <ActionFieldError name={`carriers.${i}.phone`} />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <Input
+                            aria-label="رابط التتبع"
+                            className="h-10 font-mono text-[0.78rem]"
+                            dir="ltr"
+                            value={c.trackingUrl}
+                            onChange={(e) => update({ ...c, trackingUrl: e.target.value.trim() })}
+                            placeholder={`https://…/track?no=${TRACKING_PLACEHOLDER}`}
+                          />
+                          <ActionFieldError name={`carriers.${i}.trackingUrl`} />
+                          <p className="mt-1.5 text-xs leading-5 text-taupe">
+                            {c.trackingUrl ? (
+                              c.trackingUrl.includes(TRACKING_PLACEHOLDER) ? (
+                                <>
+                                  مثال لرقم 1234567890:{" "}
+                                  <a href={sample || undefined} target="_blank" rel="noopener noreferrer" dir="ltr" className="break-all text-copper-deep underline-offset-2 hover:underline">
+                                    {sample || "رابط غير صالح"}
+                                  </a>
+                                </>
+                              ) : (
+                                <span className="text-warning">أضف {TRACKING_PLACEHOLDER} مكان رقم الشحنة في الرابط — وإلا يفتح العميل صفحة التتبع ويكتب الرقم بنفسه.</span>
+                              )
+                            ) : (
+                              "بدون رابط: يظهر للعميل رقم الشحنة ورقم الشركة للتواصل."
+                            )}
+                          </p>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <Switch checked={c.enabled} onChange={(e) => update({ ...c, enabled: e.target.checked })} label="متاحة عند شحن الطلبات" />
+                        </div>
+                      </div>
+                    );
+                  }}
+                />
+                <div>
+                  <p className="mb-2 text-xs font-medium text-taupe">شركات جاهزة (رابط التتبع مضبوط مسبقاً):</p>
+                  <div className="flex flex-wrap gap-2">
+                    {CARRIER_PRESETS.map((p) => {
+                      const added = s.carriers.some((c) => c.name === p.name);
+                      return (
+                        <button
+                          key={p.name}
+                          type="button"
+                          disabled={added || s.carriers.length >= 12}
+                          onClick={() => set("carriers", [...s.carriers, { id: newCarrierId(), name: p.name, trackingUrl: p.trackingUrl, phone: "", enabled: true }])}
+                          className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-paper px-3.5 text-[0.8rem] text-umber transition-colors hover:border-espresso hover:text-espresso disabled:pointer-events-none disabled:opacity-40"
+                        >
+                          <Plus className="size-3.5" aria-hidden />
+                          {p.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-taupe">
+                    لشركة محلية لها موقع تتبّع: افتح صفحة التتبّع عندهم، تتبّع أي شحنة، وانسخ الرابط من المتصفح ثم ضع {TRACKING_PLACEHOLDER} مكان رقم الشحنة.
+                  </p>
+                </div>
+              </div>
+            </Section>
+
             <Section title="العملة" description="الأسعار تُخزّن كأرقام صحيحة؛ تغيير العملة لا يحوّل الأسعار." aside={<span className="rounded-full bg-bone px-3 py-1 text-sm font-semibold tabular-nums text-espresso">{money(125000)}</span>}>
               <div className="grid gap-4 sm:grid-cols-3">
                 <F label="الرمز الدولي" name="currency.code">

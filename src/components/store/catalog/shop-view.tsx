@@ -17,6 +17,7 @@ import { EditorialTile } from "@/components/store/catalog/editorial-tile";
 import { ShopEmptyState } from "@/components/store/catalog/empty-state";
 import { PAGE_SIZE, activeFilterCount, piecesLabel, shopHref, type ShopParams } from "@/components/store/catalog/params";
 import { cn } from "@/lib/utils";
+import { PageBlocks } from "@/components/store/blocks/page-blocks";
 
 type Tile = { key: string; product: ProductCardData; color?: string };
 
@@ -173,6 +174,8 @@ export async function ShopView({ category, params }: { category: CategoryData | 
         />
       )}
 
+      <PageBlocks page="shop" position="top" />
+
       {/* Mobile: category rail + sticky filter/sort bar */}
       <div className="lg:hidden">
         <nav aria-label="الأقسام" className="no-scrollbar overflow-x-auto">
@@ -273,6 +276,8 @@ export async function ShopView({ category, params }: { category: CategoryData | 
           </ResultsVeil>
         </div>
       </div>
+
+      <PageBlocks page="shop" position="bottom" />
     </ShopNavProvider>
   );
 }

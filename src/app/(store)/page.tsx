@@ -10,6 +10,8 @@ import { LookOfSeason } from "@/components/store/home/look-of-season";
 import { CraftValues } from "@/components/store/home/craft-values";
 import { SocialProof } from "@/components/store/home/social-proof";
 import { AtelierBand, type AtelierSlot } from "@/components/store/home/atelier-band";
+import { BlocksRenderer } from "@/components/store/blocks/blocks-renderer";
+import { resolveHomeLayout, type HomeSectionKey } from "@/lib/blocks";
 
 export const dynamic = "force-dynamic";
 
@@ -45,21 +47,25 @@ function firstImageFor(products: ProductCardData[], predicate: (p: ProductCardDa
 export default async function HomePage() {
   const settings = await getSettings();
   const home = settings.home;
+  const layout = resolveHomeLayout(settings.layouts, home.sections);
+  const show = (key: HomeSectionKey) => layout.some((b) => b.type === "builtin" && b.key === key && b.enabled);
   const [categories, { items: products }, looks, signatureBySlug, arrivals] = await Promise.all([
     listCategories(),
     listProducts({ limit: 24 }),
     listLooks(12),
-    home.colourStory.productSlug ? getProductBySlug(home.colourStory.productSlug) : Promise.resolve(null),
-    home.newArrivals.source === "featured"
-      ? listProducts({ featured: true, limit: 12 }).then((r) => r.items)
-      : home.newArrivals.source === "newest"
-        ? listProducts({ sort: "newest", limit: 12 }).then((r) => r.items)
-        : Promise.resolve(null),
+    show("colourStory") && home.colourStory.productSlug ? getProductBySlug(home.colourStory.productSlug) : Promise.resolve(null),
+    !show("newArrivals")
+      ? Promise.resolve(null)
+      : home.newArrivals.source === "featured"
+        ? listProducts({ featured: true, limit: 12 }).then((r) => r.items)
+        : home.newArrivals.source === "newest"
+          ? listProducts({ sort: "newest", limit: 12 }).then((r) => r.items)
+          : Promise.resolve(null),
   ]);
 
   // Signature product for the colour story: the half-zip, else any multi-colour piece.
   let signature: ProductDetail | null = signatureBySlug;
-  if (!signature || signature.colors.length < 2) {
+  if (show("colourStory") && (!signature || signature.colors.length < 2)) {
     const alt = products.find((p) => p.colors.length >= 2);
     signature = alt ? await getProductBySlug(alt.slug) : null;
   }
@@ -94,7 +100,6 @@ export default async function HomePage() {
   for (const p of products) pushMedia(p.images[0]);
 
   const featuredLook = (home.look.lookSlug ? looks.find((l) => l.slug === home.look.lookSlug && l.items.length > 0) : null) ?? looks.find((l) => l.items.length > 0) ?? null;
-  const show = settings.home.sections;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -131,19 +136,18 @@ export default async function HomePage() {
         {settings.bars.marquee.enabled && <Marquee items={settings.bars.marquee.items} tone={MARQUEE_TONE[settings.bars.marquee.tone] ?? "light"} speed={settings.bars.marquee.speed} />}
       </div>
 
-      {show.categories && <CategoriesGrid categories={categories} fallbacks={fallbacks} copy={home.categories} />}
-
-      {show.colourStory && signature && signature.colors.length >= 2 && <ColourStory product={signature} eyebrow={home.colourStory.eyebrow} title={home.colourStory.title} />}
-
-      {show.newArrivals && <NewArrivals products={arrivals?.length ? arrivals : products} copy={home.newArrivals} />}
-
-      {show.look && featuredLook && <LookOfSeason look={featuredLook} eyebrow={home.look.eyebrow} />}
-
-      {show.craft && <CraftValues copy={home.craft} />}
-
-      {show.social && <SocialProof testimonials={settings.testimonials} instagram={settings.instagram} gallery={gallery} copy={home.social} />}
-
-      {show.atelier && <AtelierBand slots={slots} copy={home.atelier} />}
+      <BlocksRenderer
+        blocks={layout}
+        builtins={{
+          categories: <CategoriesGrid categories={categories} fallbacks={fallbacks} copy={home.categories} />,
+          colourStory: signature && signature.colors.length >= 2 ? <ColourStory product={signature} eyebrow={home.colourStory.eyebrow} title={home.colourStory.title} /> : null,
+          newArrivals: <NewArrivals products={arrivals?.length ? arrivals : products} copy={home.newArrivals} />,
+          look: featuredLook ? <LookOfSeason look={featuredLook} eyebrow={home.look.eyebrow} /> : null,
+          craft: <CraftValues copy={home.craft} />,
+          social: <SocialProof testimonials={settings.testimonials} instagram={settings.instagram} gallery={gallery} copy={home.social} />,
+          atelier: <AtelierBand slots={slots} copy={home.atelier} />,
+        }}
+      />
     </>
   );
 }

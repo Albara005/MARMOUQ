@@ -5,6 +5,7 @@ import { buttonClasses } from "@/components/ui/button";
 import { instagramHandle } from "@/components/store/nav";
 import type { MediaRef } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
+import { ScriptSafe } from "@/components/ui/script-safe";
 
 type Testimonial = { name: string; city: string; quote: string };
 
@@ -31,7 +32,7 @@ export function SocialProof({
           <div className="lg:col-span-5" data-reveal>
             <p className="eyebrow inline-flex items-center gap-3">
               <span className="h-px w-8 bg-gold/70" aria-hidden />
-              {copy.eyebrow}
+              <ScriptSafe text={copy.eyebrow} />
             </p>
             {copy.statValue && (
               <p className="mt-6 flex items-start gap-1 font-[family-name:var(--font-latin)] text-[5.5rem] font-medium leading-[0.85] text-espresso md:text-[8rem]" dir="ltr">

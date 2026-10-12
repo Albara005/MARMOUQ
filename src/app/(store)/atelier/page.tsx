@@ -17,6 +17,8 @@ import {
   type AtelierSlot,
   type LookMatch,
 } from "@/components/store/atelier/model";
+import { PageBlocks } from "@/components/store/blocks/page-blocks";
+import { ScriptSafe } from "@/components/ui/script-safe";
 
 export const dynamic = "force-dynamic";
 
@@ -85,7 +87,7 @@ export default async function AtelierPage({ searchParams }: { searchParams: Prom
           <div className="max-w-2xl">
             <p className="eyebrow inline-flex items-center gap-3">
               <span className="h-px w-8 bg-gold/70" aria-hidden />
-              {c["atelier.eyebrow"]}
+              <ScriptSafe text={c["atelier.eyebrow"]} />
             </p>
             <h1 className="display mt-3 text-[2.35rem] leading-[1.12] text-espresso text-balance md:text-[3.4rem]">{c["atelier.title"]}</h1>
             <p className="mt-3 max-w-xl text-[0.95rem] leading-8 text-umber text-pretty md:text-base">
@@ -103,6 +105,8 @@ export default async function AtelierPage({ searchParams }: { searchParams: Prom
         </div>
       </header>
 
+      <PageBlocks page="atelier" position="top" />
+
       {slots.length === 0 ? (
         <section className="container-luxe">
           <div className="studio-frame flex min-h-[50svh] flex-col items-center justify-center rounded-2xl px-6 py-16 text-center">
@@ -118,6 +122,8 @@ export default async function AtelierPage({ searchParams }: { searchParams: Prom
       ) : (
         <AtelierStudio slots={slots} looks={lookMatches} initial={selection} />
       )}
+
+      <PageBlocks page="atelier" position="bottom" />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { ChevronLeft } from "lucide-react";
 import { MediaImage } from "@/components/ui/media-image";
 import type { MediaRef } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
+import { ScriptSafe } from "@/components/ui/script-safe";
 
 type Crumb = { label: string; href?: string };
 
@@ -63,7 +64,7 @@ export function PageHeader({
         <div className="absolute inset-0 -z-10 bg-gradient-to-t from-espresso via-espresso/55 to-espresso/20" aria-hidden />
         <div className="container-luxe flex min-h-[46svh] flex-col justify-end pb-10 pt-16 md:min-h-[54vh] md:pb-16">
           {breadcrumbs?.length ? <Breadcrumbs items={breadcrumbs} light /> : null}
-          {eyebrow && <p className="eyebrow text-copper-soft">{eyebrow}</p>}
+          {eyebrow && <p className="eyebrow text-copper-soft"><ScriptSafe text={eyebrow} /></p>}
           <h1 className="display mt-3 max-w-3xl text-4xl leading-[1.15] text-balance md:text-6xl">{title}</h1>
           {subtitle && <p className="mt-4 max-w-xl text-[0.98rem] leading-8 text-paper/75 text-pretty">{subtitle}</p>}
           {children && <div className="mt-6">{children}</div>}
@@ -79,7 +80,7 @@ export function PageHeader({
         {eyebrow && (
           <p className="eyebrow inline-flex items-center gap-3">
             <span className="h-px w-8 bg-gold/70" aria-hidden />
-            {eyebrow}
+            <ScriptSafe text={eyebrow} />
           </p>
         )}
         <h1 className="display mt-3 max-w-4xl text-4xl leading-[1.15] text-espresso text-balance md:text-6xl">{title}</h1>

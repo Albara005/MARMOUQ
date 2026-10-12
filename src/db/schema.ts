@@ -222,6 +222,14 @@ export const orders = pgTable(
     /** Currency the customer saw at checkout (snapshot incl. rate); null = base currency */
     displayCurrency: jsonb("display_currency").$type<{ code: string; symbol: string; position: "after" | "before"; basePerUnit?: number; markup?: number; decimals?: 0 | 2; roundTo?: number } | null>(),
     shippingZoneId: integer("shipping_zone_id").references(() => shippingZones.id, { onDelete: "set null" }),
+    /** Shipment tracking (filled by the team when the parcel is handed to the courier) */
+    carrierName: text("carrier_name").notNull().default(""),
+    trackingNumber: text("tracking_number").notNull().default(""),
+    /** Resolved courier tracking page ("" = no online tracking for this courier) */
+    trackingUrl: text("tracking_url").notNull().default(""),
+    /** Courier phone / WhatsApp for customers when there is no tracking page */
+    carrierPhone: text("carrier_phone").notNull().default(""),
+    shippedAt: timestamp("shipped_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

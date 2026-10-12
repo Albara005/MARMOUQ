@@ -20,6 +20,7 @@ import {
   TikTokIcon,
   WhatsAppIcon,
 } from "@/components/ui/brand-icons";
+import { PageBlocks } from "@/components/store/blocks/page-blocks";
 
 export const dynamic = "force-dynamic";
 
@@ -257,6 +258,8 @@ export default async function ContactPage() {
         ]}
       />
 
+      <PageBlocks page="contact" position="top" />
+
       <section aria-label="طرق التواصل" className="bg-ivory py-12 md:py-20">
         <div className="container-luxe">
           {primary && (
@@ -470,6 +473,8 @@ export default async function ContactPage() {
           </div>
         </div>
       </section>
+
+      <PageBlocks page="contact" position="bottom" />
     </>
   );
 }

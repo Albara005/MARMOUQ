@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowUpLeft } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
-import { getMediaRefs, listLooks, listProducts } from "@/lib/catalog";
+import { getMediaRefs, listCategories, listLooks, listProducts } from "@/lib/catalog";
 import { PageHeader } from "@/components/admin/ui";
 import { SettingsForm } from "@/components/admin/settings/settings-form";
 
@@ -15,7 +15,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const settings = await getSettings();
   const ids = [settings.hero.mediaId, settings.hero.mobileMediaId].filter((x): x is string => !!x);
-  const [refs, products, looks] = await Promise.all([ids.length ? getMediaRefs(ids) : Promise.resolve([]), listProducts({ limit: 100 }), listLooks(50)]);
+  const [refs, products, looks, categories] = await Promise.all([
+    ids.length ? getMediaRefs(ids) : Promise.resolve([]),
+    listProducts({ limit: 100 }),
+    listLooks(50),
+    listCategories(),
+  ]);
+  // listProducts caps a page at 100 — fetch a second page for the section builder's picker (up to 200)
+  const more = products.total > products.items.length ? (await listProducts({ limit: 100, offset: 100 })).items : [];
   const heroMedia = refs.find((m) => m.id === settings.hero.mediaId);
   const mobileHeroMedia = refs.find((m) => m.id === settings.hero.mobileMediaId) ?? null;
   const initial = {
@@ -24,6 +31,11 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   };
   const productOptions = products.items.filter((p) => p.colors.length >= 2).map((p) => ({ slug: p.slug, name: p.name }));
   const lookOptions = looks.map((l) => ({ slug: l.slug, title: l.title }));
+  const catalog = {
+    products: [...products.items, ...more].map((p) => ({ id: p.id, name: p.name, imageId: p.images[0]?.id ?? null })),
+    categories: categories.map((c) => ({ slug: c.slug, name: c.name })),
+    looks: lookOptions,
+  };
 
   return (
     <div>
@@ -44,6 +56,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         mobileHeroMedia={mobileHeroMedia}
         productOptions={productOptions}
         lookOptions={lookOptions}
+        catalog={catalog}
         initialTab={typeof sp.tab === "string" ? sp.tab : "identity"} />
     </div>
   );

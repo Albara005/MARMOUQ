@@ -5,6 +5,8 @@ import { db } from "@/db";
 import { settings } from "@/db/schema";
 import { DEFAULT_CURRENCY, type Currency } from "@/lib/money";
 import { DEFAULT_NAV, resolveCopy, type NavLink } from "@/lib/copy";
+import type { CustomPage, HomeSectionKey, Layouts } from "@/lib/blocks";
+import type { Carrier } from "@/lib/carriers";
 import { cookies } from "next/headers";
 
 export type PaymentAccount = { bank: string; holder: string; number: string };
@@ -28,7 +30,7 @@ export type MarketCurrency = {
 
 export type BarTone = "espresso" | "copper" | "burgundy" | "navy" | "ivory";
 
-export type HomeSectionKey = "categories" | "colourStory" | "newArrivals" | "look" | "craft" | "social" | "atelier";
+export type { HomeSectionKey };
 
 export type StoreSettings = {
   storeName: string;
@@ -93,7 +95,14 @@ export type StoreSettings = {
   theme: { accent: string; dark: string; background: string };
   /** Optional logo image replacing the text wordmark */
   brand: { logoId: string | null; logoHeight: number };
+  /** Page sections: the ordered home layout + extra sections on other pages (see src/lib/blocks.ts) */
+  layouts: Layouts;
+  /** Merchant-built pages served at /pages/[slug] */
+  customPages: CustomPage[];
+  /** Shipping companies + their tracking-link templates (see src/lib/carriers.ts) */
+  carriers: Carrier[];
   home: {
+    /** Legacy on/off switches — only used until the home layout is customised (layouts.home) */
     sections: Record<HomeSectionKey, boolean>;
     categories: { eyebrow: string; title: string; subtitle: string };
     colourStory: { eyebrow: string; title: string; productSlug: string };
@@ -163,6 +172,9 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   faq: [],
   theme: { accent: "", dark: "", background: "" },
   brand: { logoId: null, logoHeight: 40 },
+  layouts: {},
+  customPages: [],
+  carriers: [],
   bars: {
     announcement: { enabled: true, tone: "espresso", href: "", interval: 5 },
     marquee: { enabled: true, tone: "ivory", items: ["قطن 100%", "صنع إيطالي 🇮🇹", "قصّات مدروسة", "توصيل لكل المحافظات", "الدفع عند الاستلام", "استبدال سهل"], speed: 38 },

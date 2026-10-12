@@ -11,6 +11,8 @@ import { LookPieces, LookPriceBlock, atelierHrefForLook, pad2 } from "@/componen
 import { imagesForColor } from "@/lib/product-images";
 import type { Currency } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { PageBlocks } from "@/components/store/blocks/page-blocks";
+import { ScriptSafe } from "@/components/ui/script-safe";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +56,7 @@ export default async function LooksPage() {
             <div className="lg:col-span-8">
               <p className="eyebrow inline-flex items-center gap-3">
                 <span className="h-px w-8 bg-gold/70" aria-hidden />
-                {c["looks.eyebrow"]}
+                <ScriptSafe text={c["looks.eyebrow"]} />
               </p>
               <h1 className="display mt-4 text-[2.6rem] leading-[1.1] text-espresso text-balance md:text-7xl">
                 {c["looks.title1"]}
@@ -87,6 +89,8 @@ export default async function LooksPage() {
           <div className="hairline" aria-hidden />
         </div>
       </header>
+
+      <PageBlocks page="looks" position="top" />
 
       {ready.length === 0 ? (
         <section className="bg-ivory py-20">
@@ -153,6 +157,8 @@ export default async function LooksPage() {
           </div>
         </div>
       </section>
+
+      <PageBlocks page="looks" position="bottom" />
     </>
   );
 }

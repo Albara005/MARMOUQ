@@ -15,6 +15,7 @@ import { CheckoutSteps } from "@/components/store/checkout/steps";
 import { SuccessMark } from "@/components/store/checkout/success-mark";
 import { OrderTimeline } from "@/components/store/checkout/order-timeline";
 import { CopyButton, PrintButton } from "@/components/store/checkout/client-buttons";
+import { ShipmentCard } from "@/components/store/checkout/shipment-card";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,7 @@ export default async function OrderConfirmationPage({ params, searchParams }: Pr
   const name = firstName(order.customerName);
   const terminal = order.status === "cancelled" || order.status === "returned";
   const itemsCount = order.items.reduce((s, i) => s + i.quantity, 0);
-  const statusEvents = order.events.filter((e) => !e.status.startsWith("payment:") && e.status !== "note").map((e) => ({ status: e.status, at: e.createdAt }));
+  const statusEvents = order.events.filter((e) => !e.status.startsWith("payment:") && e.status !== "note" && e.status !== "tracking").map((e) => ({ status: e.status, at: e.createdAt }));
   const paymentEvents = order.events.filter((e) => e.status.startsWith("payment:"));
   const lastPaymentNote = paymentEvents[paymentEvents.length - 1]?.note;
   const isTransfer = order.paymentMethod === "transfer";
@@ -113,6 +114,12 @@ export default async function OrderConfirmationPage({ params, searchParams }: Pr
         </div>
 
         <aside className="space-y-6 lg:col-span-5 lg:row-span-2 lg:self-start">
+          {(order.trackingNumber || order.carrierName) && order.status !== "cancelled" && order.status !== "returned" && (
+            <ShipmentCard
+              orderNumber={order.number}
+              shipment={{ carrierName: order.carrierName, trackingNumber: order.trackingNumber, trackingUrl: order.trackingUrl, carrierPhone: order.carrierPhone }}
+            />
+          )}
           <Card title="حالة الطلب" eyebrow="STATUS" action={<Badge tone={ORDER_STATUS_META[order.status].tone} dot>{ORDER_STATUS_META[order.status].label}</Badge>}>
             <OrderTimeline status={order.status} events={statusEvents} />
           </Card>

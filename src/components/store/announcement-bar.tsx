@@ -81,7 +81,7 @@ export function AnnouncementBar({
               key={`${i}-${m}`}
               aria-hidden={i !== index}
               className={cn(
-                "absolute inset-0 flex items-center justify-center truncate px-2 text-center text-[0.72rem] tracking-[0.04em] transition-all duration-700 ease-[var(--ease-out-expo)] sm:text-[0.78rem]",
+                "absolute inset-0 flex items-center justify-center truncate px-2 text-center text-[0.72rem] transition-all duration-700 ease-[var(--ease-out-expo)] sm:text-[0.78rem]",
                 i === index ? "translate-y-0 opacity-100" : i === (index - 1 + items.length) % items.length ? "-translate-y-3 opacity-0" : "translate-y-3 opacity-0",
               )}
             >

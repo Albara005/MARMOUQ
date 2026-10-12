@@ -17,6 +17,8 @@ export type TrackedOrder = {
   itemsCount: number;
   items: { name: string; color: string; size: string; quantity: number; imageId: string | null }[];
   events: { status: string; at: string }[];
+  /** courier & tracking link once the parcel is handed over */
+  shipment: { carrierName: string; trackingNumber: string; trackingUrl: string; carrierPhone: string } | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -71,7 +73,7 @@ export async function trackOrder(_prev: TrackState, formData: FormData): Promise
         values,
       };
     }
-    const statusEvents = order.events.filter((e) => !e.status.startsWith("payment:") && e.status !== "note");
+    const statusEvents = order.events.filter((e) => !e.status.startsWith("payment:") && e.status !== "note" && e.status !== "tracking");
     return {
       status: "found",
       values,
@@ -86,6 +88,10 @@ export async function trackOrder(_prev: TrackState, formData: FormData): Promise
         itemsCount: order.items.reduce((s, i) => s + i.quantity, 0),
         items: order.items.map((i) => ({ name: i.name, color: i.color, size: i.size, quantity: i.quantity, imageId: i.imageId })),
         events: statusEvents.map((e) => ({ status: e.status, at: e.createdAt.toISOString() })),
+        shipment:
+          order.trackingNumber || order.carrierName
+            ? { carrierName: order.carrierName, trackingNumber: order.trackingNumber, trackingUrl: order.trackingUrl, carrierPhone: order.carrierPhone }
+            : null,
         createdAt: order.createdAt.toISOString(),
         updatedAt: order.updatedAt.toISOString(),
       },

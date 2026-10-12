@@ -15,6 +15,13 @@
       "when": 1791783398436,
       "tag": "0001_order_display_currency",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791801645456,
+      "tag": "0002_order_tracking",
+      "breakpoints": true
     }
   ]
 }

@@ -338,6 +338,44 @@ export async function updateOrderStatus(orderId: number, next: OrderStatus, note
   }
 }
 
+export type ShipmentInput = { carrierName: string; trackingNumber: string; trackingUrl: string; carrierPhone: string };
+
+/**
+ * Saves (or clears, when trackingNumber is empty) the courier & tracking number of an order,
+ * logs it in the order history, and optionally moves the order to «shipped».
+ */
+export async function setOrderShipment(orderId: number, input: ShipmentInput, markShipped: boolean, adminId: number | null): Promise<{ ok: boolean; error?: string }> {
+  const clearing = !input.trackingNumber && !input.carrierName;
+  try {
+    const order = await db.query.orders.findFirst({ where: eq(orders.id, orderId), columns: { id: true, status: true, shippedAt: true } });
+    if (!order) return { ok: false, error: "الطلب غير موجود" };
+    await db.transaction(async (tx) => {
+      await tx
+        .update(orders)
+        .set({
+          carrierName: input.carrierName,
+          trackingNumber: input.trackingNumber,
+          trackingUrl: input.trackingUrl,
+          carrierPhone: input.carrierPhone,
+          shippedAt: clearing ? null : (order.shippedAt ?? new Date()),
+          updatedAt: new Date(),
+        })
+        .where(eq(orders.id, orderId));
+      const note = clearing
+        ? "حُذفت بيانات الشحن"
+        : [input.carrierName && `الشركة: ${input.carrierName}`, input.trackingNumber && `رقم التتبع: ${input.trackingNumber}`].filter(Boolean).join(" · ");
+      await tx.insert(orderEvents).values({ orderId, status: "tracking", note, adminId });
+    });
+    if (!clearing && markShipped && ["pending", "confirmed", "processing"].includes(order.status)) {
+      return await updateOrderStatus(orderId, "shipped", input.carrierName ? `شُحن مع ${input.carrierName}` : "", adminId);
+    }
+    return { ok: true };
+  } catch (err) {
+    console.error("[orders] shipment update failed:", err);
+    return { ok: false, error: "تعذّر حفظ بيانات الشحن" };
+  }
+}
+
 export async function setPaymentStatus(orderId: number, status: PaymentStatus, adminId: number | null): Promise<void> {
   await db.transaction(async (tx) => {
     await tx.update(orders).set({ paymentStatus: status, updatedAt: new Date() }).where(eq(orders.id, orderId));

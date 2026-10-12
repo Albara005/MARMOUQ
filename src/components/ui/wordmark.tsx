@@ -20,8 +20,8 @@ export function Wordmark({
         MARMOUQ
       </span>
       {showArabic && (
-        <span dir="rtl" className={cn("mt-1 font-[family-name:var(--font-display)] opacity-70", size === "lg" ? "text-sm tracking-[0.5em]" : "text-[0.6rem] tracking-[0.45em]")}>
-          مـرمـوق
+        <span dir="rtl" className={cn("mt-1 font-[family-name:var(--font-display)] opacity-70", size === "lg" ? "text-sm" : "text-[0.62rem]")}>
+          مــرمــوق
         </span>
       )}
     </span>

@@ -8,6 +8,7 @@ import { Price } from "@/components/store/store-provider";
 import { imagesForColor, sortSizes } from "@/components/store/product-card";
 import type { ProductDetail } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
+import { ScriptSafe } from "@/components/ui/script-safe";
 
 /* ───────────── Colour maths (muted section tint) ───────────── */
 
@@ -118,7 +119,7 @@ export function ColourStory({ product, eyebrow = "The Colour Story", title = "ق
         <div className="lg:col-span-5" data-reveal>
           <p className={cn("eyebrow inline-flex items-center gap-3", theme.dark && "text-copper-soft")}>
             <span className="h-px w-8 bg-current opacity-60" aria-hidden />
-            {eyebrow}
+            <ScriptSafe text={eyebrow} />
           </p>
           <h2 id="colour-story-title" className="display mt-5 text-[2.4rem] leading-[1.1] md:text-6xl">
             {title}

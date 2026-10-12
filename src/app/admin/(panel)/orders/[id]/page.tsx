@@ -19,6 +19,7 @@ import { Avatar, Card, PageHeader, PaymentBadge, StatusBadge, FlashMessage } fro
 import { OrderNoteForm, PaymentActions, QuickStatusActions, StatusWorkflowForm } from "@/components/admin/orders/order-actions";
 import { WhatsAppComposer } from "@/components/admin/orders/whatsapp-composer";
 import { orderTemplates } from "@/components/admin/orders/templates";
+import { ShipmentForm } from "@/components/admin/orders/shipment-form";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,7 @@ function instagramHandle(url: string): string | null {
 
 const EVENT_META = (status: string) => {
   if (status === "note") return { icon: StickyNote, label: "ملاحظة داخلية", dot: "bg-gold" };
+  if (status === "tracking") return { icon: Truck, label: "بيانات الشحن", dot: "bg-copper" };
   if (status.startsWith("payment:")) {
     const p = status.slice(8) as keyof typeof PAYMENT_STATUS_META;
     return { icon: Wallet, label: `الدفع: ${PAYMENT_STATUS_META[p]?.label ?? p}`, dot: p === "paid" ? "bg-success" : p === "refunded" ? "bg-taupe" : "bg-warning" };
@@ -99,6 +101,7 @@ export default async function OrderDetailPage({ params }: Props) {
     instagramHandle: instagramHandle(settings.instagram),
     transferAccounts: settings.payments.transfer.accounts,
     eta: zone?.eta || null,
+    shipment: order.trackingNumber || order.carrierName ? { carrierName: order.carrierName, trackingNumber: order.trackingNumber, trackingUrl: order.trackingUrl } : null,
   });
 
   const stepIndex = CUSTOMER_TIMELINE.indexOf(order.status);
@@ -316,6 +319,15 @@ export default async function OrderDetailPage({ params }: Props) {
                 </div>
               )}
             </div>
+          </Card>
+
+          <Card className="order-3" title="الشحن والتتبّع" description="اختر شركة الشحن واكتب رقم البوليصة — يظهر للعميل زر لتتبّع شحنته.">
+            <ShipmentForm
+              orderId={order.id}
+              status={order.status}
+              carriers={settings.carriers}
+              current={{ carrierName: order.carrierName, trackingNumber: order.trackingNumber, trackingUrl: order.trackingUrl, carrierPhone: order.carrierPhone }}
+            />
           </Card>
 
           <Card className="order-4" title="الدفع" actions={<PaymentBadge status={order.paymentStatus} />}>

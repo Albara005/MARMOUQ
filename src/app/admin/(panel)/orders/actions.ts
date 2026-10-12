@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
-import { addOrderNote, setPaymentStatus, updateOrderStatus } from "@/lib/orders";
+import { addOrderNote, setOrderShipment, setPaymentStatus, updateOrderStatus } from "@/lib/orders";
+import { getSettings } from "@/lib/settings";
+import { buildTrackingUrl } from "@/lib/carriers";
+import { normalizePhone } from "@/lib/utils";
 import { ORDER_STATUSES, ORDER_STATUS_META } from "@/lib/order-status";
 import { actionError, actionOk, zodFieldErrors, type ActionResult } from "@/components/admin/action-result";
 import type { OrderStatus } from "@/db/schema";
@@ -75,4 +78,72 @@ export async function addOrderNoteAction(_prev: ActionResult, formData: FormData
   }
   refresh(parsed.data.orderId);
   return actionOk("أُضيفت الملاحظة إلى سجل الطلب");
+}
+
+const shipmentSchema = z
+  .object({
+    orderId: idSchema,
+    intent: z.enum(["save", "clear"]),
+    /** a carrier id from settings, or "other" */
+    carrierId: z.string().trim().max(40).optional().default(""),
+    customName: z.string().trim().max(40, "الحد الأقصى 40 حرفاً").optional().default(""),
+    customUrl: z
+      .string()
+      .trim()
+      .max(500, "الرابط طويل")
+      .optional()
+      .default("")
+      .refine((v) => v === "" || /^https:\/\/[^\s]+\.[^\s]+$/i.test(v), "الرابط يجب أن يبدأ بـ https://"),
+    trackingNumber: z
+      .string()
+      .trim()
+      .max(60, "رقم التتبع طويل")
+      .optional()
+      .default("")
+      .transform((v) => v.replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660)))
+      .refine((v) => v === "" || /^[A-Za-z0-9 _./-]+$/.test(v), "رقم التتبع يحتوي على رموز غير مقبولة"),
+    markShipped: z.preprocess((v) => v === "on" || v === "true", z.boolean()),
+  })
+  .superRefine((v, ctx) => {
+    if (v.intent === "clear") return;
+    if (!v.carrierId) ctx.addIssue({ code: "custom", path: ["carrierId"], message: "اختر شركة الشحن" });
+    if (v.carrierId === "other" && v.customName.length < 2) ctx.addIssue({ code: "custom", path: ["customName"], message: "اكتب اسم الشركة" });
+    if (!v.trackingNumber && !(v.carrierId === "other" && v.customUrl)) ctx.addIssue({ code: "custom", path: ["trackingNumber"], message: "أدخل رقم التتبع (البوليصة)" });
+  });
+
+export async function saveShipmentAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const parsed = shipmentSchema.safeParse({
+    orderId: formData.get("orderId"),
+    intent: formData.get("intent") ?? "save",
+    carrierId: formData.get("carrierId") ?? "",
+    customName: formData.get("customName") ?? "",
+    customUrl: formData.get("customUrl") ?? "",
+    trackingNumber: formData.get("trackingNumber") ?? "",
+    markShipped: formData.get("markShipped") ?? "",
+  });
+  if (!parsed.success) return actionError("لم تُحفظ بيانات الشحن", zodFieldErrors(parsed.error));
+  const v = parsed.data;
+
+  let input = { carrierName: "", trackingNumber: "", trackingUrl: "", carrierPhone: "" };
+  if (v.intent === "save") {
+    if (v.carrierId === "other") {
+      input = { carrierName: v.customName, trackingNumber: v.trackingNumber, trackingUrl: buildTrackingUrl(v.customUrl, v.trackingNumber) || v.customUrl, carrierPhone: "" };
+    } else {
+      const carrier = (await getSettings()).carriers.find((c) => c.id === v.carrierId);
+      if (!carrier) return actionError("شركة الشحن غير موجودة — حدّث الصفحة", { carrierId: "اختر شركة من القائمة" });
+      input = {
+        carrierName: carrier.name,
+        trackingNumber: v.trackingNumber,
+        trackingUrl: buildTrackingUrl(carrier.trackingUrl, v.trackingNumber),
+        carrierPhone: carrier.phone ? normalizePhone(carrier.phone) : "",
+      };
+    }
+  }
+
+  const res = await setOrderShipment(v.orderId, input, v.markShipped, admin.id);
+  if (!res.ok) return actionError(res.error ?? "تعذّر حفظ بيانات الشحن");
+  refresh(v.orderId);
+  revalidatePath("/order", "layout");
+  return actionOk(v.intent === "clear" ? "حُذفت بيانات الشحن" : v.markShipped ? "حُفظ رقم التتبع وأصبح الطلب «تم الشحن»" : "حُفظ رقم التتبع — يظهر للعميل الآن");
 }

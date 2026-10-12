@@ -4,6 +4,7 @@ import { InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/ui/brand-i
 import { NewsletterForm } from "@/components/store/newsletter-form";
 import { SERVICE_LINKS, categoryHref, instagramHandle } from "@/components/store/nav";
 import { whatsappLink } from "@/lib/utils";
+import { ScriptSafe } from "@/components/ui/script-safe";
 
 export type FooterInfo = {
   storeName: string;
@@ -32,7 +33,7 @@ export function Footer({ info, categories, copy = {} }: { info: FooterInfo; cate
           <div className="md:col-span-6">
             <p className="eyebrow inline-flex items-center gap-3">
               <span className="h-px w-8 bg-gold/70" aria-hidden />
-              {c("footer.listEyebrow", "The Private List")}
+              <ScriptSafe text={c("footer.listEyebrow", "The Private List")} />
             </p>
             <h2 id="vip-title" className="display mt-4 text-3xl leading-tight text-espresso text-balance md:text-[2.75rem]">
               {c("footer.listTitle", "انضم لقائمة مرموق الخاصة")}

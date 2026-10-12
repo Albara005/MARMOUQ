@@ -8,6 +8,7 @@ import { MediaImage } from "@/components/ui/media-image";
 import { ButtonLink } from "@/components/ui/button";
 import { InstagramIcon } from "@/components/ui/brand-icons";
 import { cn } from "@/lib/utils";
+import { PageBlocks } from "@/components/store/blocks/page-blocks";
 
 export const dynamic = "force-dynamic";
 
@@ -92,6 +93,8 @@ export default async function AboutPage() {
         media={cover}
         breadcrumbs={[{ label: "الرئيسية", href: "/" }, { label: "قصتنا" }]}
       />
+
+      <PageBlocks page="about" position="top" />
 
       {/* ───────── The word ───────── */}
       <section aria-labelledby="meaning" className="bg-ivory py-20 md:py-32">
@@ -263,6 +266,8 @@ export default async function AboutPage() {
           </div>
         </div>
       </section>
+
+      <PageBlocks page="about" position="bottom" />
     </>
   );
 }

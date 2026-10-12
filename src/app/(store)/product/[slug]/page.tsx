@@ -9,6 +9,7 @@ import { ProductDetails } from "@/components/store/product/product-details";
 import { CompleteTheLook } from "@/components/store/product/complete-the-look";
 import { ProductRail } from "@/components/store/product/product-rail";
 import { RecentlyViewed } from "@/components/store/product/recently-viewed";
+import { PageBlocks } from "@/components/store/blocks/page-blocks";
 
 export const dynamic = "force-dynamic";
 
@@ -124,6 +125,8 @@ export default async function ProductPage({ params, searchParams }: Props) {
 
       <div className="h-20 md:h-28" aria-hidden />
 
+      <PageBlocks page="product" position="top" />
+
       {look && look.items.length > 0 && <CompleteTheLook look={look} currentProductId={product.id} otherLooks={otherLooks} />}
 
       {related.length > 0 && (
@@ -134,6 +137,8 @@ export default async function ProductPage({ params, searchParams }: Props) {
       )}
 
       <RecentlyViewed currentId={product.id} />
+
+      <PageBlocks page="product" position="bottom" />
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(product, settings.currency.code) }} />
     </>

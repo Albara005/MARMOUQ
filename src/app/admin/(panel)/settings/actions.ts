@@ -9,6 +9,8 @@ import { requireAdmin } from "@/lib/auth";
 import { getSettings, saveSettings, type StoreSettings } from "@/lib/settings";
 import { normalizePhone } from "@/lib/utils";
 import { COPY_GROUPS } from "@/lib/copy";
+import { blockMediaIds, type Block } from "@/lib/blocks";
+import { customPagesSchema, layoutsSchema } from "@/lib/blocks-schema";
 import { actionError, actionOk, zodFieldErrors, type ActionResult } from "@/components/admin/action-result";
 
 const text = (max: number, msg = `الحد الأقصى ${max} حرفاً`) => z.string().trim().max(max, msg);
@@ -156,6 +158,23 @@ const settingsSchema = z
         .nullable(),
       logoHeight: z.coerce.number().int().min(20).max(96),
     }),
+    carriers: z
+      .array(
+        z.object({
+          id: z.string().regex(/^[A-Za-z0-9_-]{4,40}$/),
+          name: required(2, 40, "اسم الشركة مطلوب"),
+          trackingUrl: z
+            .string()
+            .trim()
+            .max(300, "الرابط طويل")
+            .refine((v) => v === "" || /^https:\/\/[^\s]+\.[^\s]+$/i.test(v), "الرابط يجب أن يبدأ بـ https://"),
+          phone,
+          enabled: z.boolean(),
+        }),
+      )
+      .max(12, "12 شركة كحد أقصى"),
+    layouts: layoutsSchema,
+    customPages: customPagesSchema,
     home: z.object({
       sections: z.object({
         categories: z.boolean(),
@@ -215,6 +234,24 @@ export async function saveSettingsAction(_prev: ActionResult, formData: FormData
     const found = await db.select({ id: media.id }).from(media).where(inArray(media.id, heroIds));
     if (v.hero.mediaId && !found.some((f) => f.id === v.hero.mediaId)) return actionError("صورة الواجهة غير موجودة", { "hero.mediaId": "ارفع الصورة من جديد" });
     if (v.hero.mobileMediaId && !found.some((f) => f.id === v.hero.mobileMediaId)) return actionError("صورة الجوال غير موجودة", { "hero.mobileMediaId": "ارفع الصورة من جديد" });
+  }
+
+  // Section images: drop references to media that no longer exists (never fail the save for it)
+  const allBlocks: Block[] = [
+    ...(v.layouts.home ?? []),
+    ...(["shop", "product", "looks", "atelier", "about", "contact"] as const).flatMap((k) => v.layouts[k] ?? []),
+    ...v.customPages.flatMap((p) => p.blocks),
+  ] as Block[];
+  const blockIds = blockMediaIds(allBlocks);
+  const found = new Set(blockIds.length ? (await db.select({ id: media.id }).from(media).where(inArray(media.id, blockIds))).map((f) => f.id) : []);
+  const keep = (id: string | null) => (id && found.has(id) ? id : null);
+  for (const b of allBlocks) {
+    if (b.type === "banner") {
+      b.mediaId = keep(b.mediaId);
+      b.mobileMediaId = keep(b.mobileMediaId);
+    } else if (b.type === "imageText") b.mediaId = keep(b.mediaId);
+    else if (b.type === "video") b.posterId = keep(b.posterId);
+    else if (b.type === "gallery") b.items = b.items.filter((it) => it.mediaId && found.has(it.mediaId));
   }
 
   const copy: Record<string, string> = {};

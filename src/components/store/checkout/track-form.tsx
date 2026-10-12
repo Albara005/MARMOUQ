@@ -13,6 +13,7 @@ import { trackOrder, type TrackState, type TrackedOrder } from "@/app/(store)/tr
 import { ORDER_STATUS_META, PAYMENT_METHOD_LABELS, PAYMENT_STATUS_META } from "@/lib/order-status";
 import { cn, formatDateTime, whatsappLink } from "@/lib/utils";
 import { OrderTimeline } from "./order-timeline";
+import { ShipmentCard } from "./shipment-card";
 import { piecesLabel } from "./summary";
 
 export function TrackForm({ defaultNumber = "" }: { defaultNumber?: string }) {
@@ -157,6 +158,8 @@ function TrackResult({ order }: { order: TrackedOrder }) {
           {meta.hint} · آخر تحديث {formatDateTime(order.updatedAt)}
         </p>
       </header>
+
+      {order.shipment && !terminal && <ShipmentCard shipment={order.shipment} orderNumber={order.number} className="mx-5 mt-5 md:mx-8 md:mt-8" />}
 
       <div className="grid gap-8 p-5 md:grid-cols-2 md:p-8">
         <section aria-label="مراحل الطلب">
