@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ChevronLeft, RefreshCcw, Sparkles, Truck, Wallet } from "lucide-react";
-import { getSettings } from "@/lib/settings";
+import { getDisplayCurrency, getSettings } from "@/lib/settings";
 import { getLookBySlug, listCategories, listLooks } from "@/lib/catalog";
 import { imagesForColor } from "@/lib/product-images";
 import { formatMoney } from "@/lib/money";
@@ -41,7 +41,7 @@ export default async function LookPage({ params }: Props) {
   const [look, settings, allLooks, categories] = await Promise.all([getLookBySlug(slug), getSettings(), listLooks(24), listCategories()]);
   if (!look) notFound();
 
-  const currency = settings.currency;
+  const currency = await getDisplayCurrency(settings);
   const savings = look.total - look.bundleTotal;
   const index = Math.max(0, allLooks.findIndex((l) => l.id === look.id));
   const others = allLooks.filter((l) => l.id !== look.id && l.items.length > 0).slice(0, 3);

@@ -4,8 +4,30 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { settings } from "@/db/schema";
 import { DEFAULT_CURRENCY, type Currency } from "@/lib/money";
+import { cookies } from "next/headers";
 
 export type PaymentAccount = { bank: string; holder: string; number: string };
+
+/** An extra display currency for international customers (prices are always stored in the base currency). */
+export type MarketCurrency = {
+  code: string;
+  symbol: string;
+  /** Arabic name shown in the switcher, e.g. "ريال سعودي" */
+  label: string;
+  position: "after" | "before";
+  /** How many base-currency units equal 1 unit of this currency (1 SAR = 140 YER → 140) */
+  basePerUnit: number;
+  /** Market markup in percent on top of the conversion (shipping/fees for that market) */
+  markup: number;
+  decimals: 0 | 2;
+  /** Round converted prices to this step (1, 5, 10 …); 0 = none */
+  roundTo: number;
+  enabled: boolean;
+};
+
+export type BarTone = "espresso" | "copper" | "burgundy" | "navy" | "ivory";
+
+export type HomeSectionKey = "categories" | "colourStory" | "newArrivals" | "look" | "craft" | "social" | "atelier";
 
 export type StoreSettings = {
   storeName: string;
@@ -40,6 +62,19 @@ export type StoreSettings = {
   testimonials: { name: string; city: string; quote: string }[];
   lowStockThreshold: number;
   seo: { title: string; description: string };
+  /** International selling: extra display currencies + the customer-facing switcher */
+  markets: {
+    switcher: boolean;
+    /** Currency shown to first-time visitors ("" = base currency) */
+    defaultCode: string;
+    currencies: MarketCurrency[];
+  };
+  /** Announcement bar (top) and the moving brand band on the home page */
+  bars: {
+    announcement: { enabled: boolean; tone: BarTone; href: string; interval: number };
+    marquee: { enabled: boolean; tone: BarTone; items: string[]; speed: number };
+  };
+  home: { sections: Record<HomeSectionKey, boolean> };
 };
 
 export const DEFAULT_SETTINGS: StoreSettings = {
@@ -89,6 +124,12 @@ export const DEFAULT_SETTINGS: StoreSettings = {
     title: "مرموق | MARMOUQ — أزياء رجالية راقية",
     description: "طريقك لتكون شخصية مرموقة. ملابس رجالية راقية بتفاصيل مختارة بعناية: تريكو قطني إيطالي، قمصان، بناطيل وأحذية.",
   },
+  markets: { switcher: true, defaultCode: "", currencies: [] },
+  bars: {
+    announcement: { enabled: true, tone: "espresso", href: "", interval: 5 },
+    marquee: { enabled: true, tone: "ivory", items: ["قطن 100%", "صنع إيطالي 🇮🇹", "قصّات مدروسة", "توصيل لكل المحافظات", "الدفع عند الاستلام", "استبدال سهل"], speed: 38 },
+  },
+  home: { sections: { categories: true, colourStory: true, newArrivals: true, look: true, craft: true, social: true, atelier: true } },
 };
 
 const KEY = "store";
@@ -125,12 +166,16 @@ export async function saveSettings(next: StoreSettings): Promise<void> {
 }
 
 /** The subset of settings that is safe and useful on the client. */
-export type PublicStoreConfig = Pick<
-  StoreSettings,
-  "storeName" | "storeNameEn" | "tagline" | "whatsapp" | "instagram" | "tiktok" | "currency" | "freeShippingThreshold"
->;
+export type PublicStoreConfig = Pick<StoreSettings, "storeName" | "storeNameEn" | "tagline" | "whatsapp" | "instagram" | "tiktok" | "freeShippingThreshold"> & {
+  /** The visitor's DISPLAY currency (converts from base). */
+  currency: Currency;
+  baseCurrency: Currency;
+  /** Currencies offered in the switcher (base first); empty when the switcher is off */
+  currencyOptions: { code: string; symbol: string; label: string }[];
+};
 
-export function toPublicConfig(s: StoreSettings): PublicStoreConfig {
+export function toPublicConfig(s: StoreSettings, display?: Currency): PublicStoreConfig {
+  const enabled = s.markets.currencies.filter((c) => c.enabled && c.basePerUnit > 0);
   return {
     storeName: s.storeName,
     storeNameEn: s.storeNameEn,
@@ -138,7 +183,34 @@ export function toPublicConfig(s: StoreSettings): PublicStoreConfig {
     whatsapp: s.whatsapp,
     instagram: s.instagram,
     tiktok: s.tiktok,
-    currency: s.currency,
+    currency: display ?? s.currency,
+    baseCurrency: s.currency,
     freeShippingThreshold: s.freeShippingThreshold,
+    currencyOptions:
+      s.markets.switcher && enabled.length
+        ? [{ code: s.currency.code, symbol: s.currency.symbol, label: "العملة الأساسية" }, ...enabled.map((c) => ({ code: c.code, symbol: c.symbol, label: c.label || c.code }))]
+        : [],
   };
+}
+
+/** Resolves a currency code to a display currency (falls back to the base). Pure — safe anywhere. */
+export function resolveDisplayCurrency(s: StoreSettings, code: string | null | undefined): Currency {
+  const want = (code || s.markets.defaultCode || "").toUpperCase();
+  const m = s.markets.currencies.find((c) => c.enabled && c.basePerUnit > 0 && c.code === want);
+  if (!m) return s.currency;
+  return { code: m.code, symbol: m.symbol, position: m.position, basePerUnit: m.basePerUnit, markup: m.markup, decimals: m.decimals, roundTo: m.roundTo };
+}
+
+export const CURRENCY_COOKIE = "mrq_cur";
+
+/** The visitor's display currency, from the switcher cookie (server components only). */
+export async function getDisplayCurrency(s?: StoreSettings): Promise<Currency> {
+  const settings = s ?? (await getSettings());
+  let code: string | undefined;
+  try {
+    code = (await cookies()).get(CURRENCY_COOKIE)?.value;
+  } catch {
+    code = undefined;
+  }
+  return resolveDisplayCurrency(settings, code);
 }

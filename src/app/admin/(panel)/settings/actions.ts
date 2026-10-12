@@ -40,6 +40,8 @@ const href = z
   .max(200)
   .refine((v) => /^\/[^\s]*$/.test(v) || /^https:\/\/[^\s]+$/i.test(v), "ابدأ الرابط بـ / لصفحة داخلية أو https://");
 
+const TONE = z.enum(["espresso", "copper", "burgundy", "navy", "ivory"]);
+
 const money = (max: number) => z.coerce.number({ message: "أدخل رقماً" }).int("أدخل رقماً صحيحاً").min(0, "لا يقبل قيمة سالبة").max(max, "القيمة كبيرة جداً");
 
 const settingsSchema = z
@@ -100,10 +102,62 @@ const settingsSchema = z
       .array(z.object({ name: required(2, 40, "الاسم مطلوب"), city: text(30), quote: required(5, 300, "اكتب الشهادة") }))
       .max(12, "12 شهادة كحد أقصى"),
     seo: z.object({ title: required(5, 80, "عنوان الصفحة مطلوب"), description: text(200) }),
+    markets: z.object({
+      switcher: z.boolean(),
+      defaultCode: z.string().trim().toUpperCase().max(3),
+      currencies: z
+        .array(
+          z.object({
+            code: z
+              .string()
+              .trim()
+              .toUpperCase()
+              .regex(/^[A-Z]{3}$/, "رمز من 3 أحرف لاتينية مثل SAR"),
+            symbol: required(1, 8, "رمز العملة مطلوب"),
+            label: text(30),
+            position: z.enum(["after", "before"]),
+            basePerUnit: z.coerce.number({ message: "أدخل سعر الصرف" }).positive("سعر الصرف يجب أن يكون أكبر من صفر").max(1_000_000_000),
+            markup: z.coerce.number({ message: "أدخل نسبة" }).min(-50, "أقل نسبة -50%").max(300, "أعلى نسبة 300%"),
+            decimals: z.union([z.literal(0), z.literal(2)]),
+            roundTo: z.coerce.number({ message: "أدخل رقماً" }).min(0).max(100_000),
+            enabled: z.boolean(),
+          }),
+        )
+        .max(12, "12 عملة كحد أقصى"),
+    }),
+    bars: z.object({
+      announcement: z.object({ enabled: z.boolean(), tone: TONE, href: z.union([z.literal(""), href]), interval: z.coerce.number().int().min(2, "ثانيتان على الأقل").max(30, "30 ثانية كحد أقصى") }),
+      marquee: z.object({
+        enabled: z.boolean(),
+        tone: TONE,
+        items: z.array(required(1, 60, "النص فارغ")).max(12, "12 عبارة كحد أقصى"),
+        speed: z.coerce.number().int().min(10, "10 ثوانٍ على الأقل").max(120, "120 ثانية كحد أقصى"),
+      }),
+    }),
+    home: z.object({
+      sections: z.object({
+        categories: z.boolean(),
+        colourStory: z.boolean(),
+        newArrivals: z.boolean(),
+        look: z.boolean(),
+        craft: z.boolean(),
+        social: z.boolean(),
+        atelier: z.boolean(),
+      }),
+    }),
   })
   .superRefine((v, ctx) => {
     if (!v.payments.cod.enabled && !v.payments.transfer.enabled) {
       ctx.addIssue({ code: "custom", path: ["payments", "cod", "enabled"], message: "فعّل طريقة دفع واحدة على الأقل" });
+    }
+    const codes = new Set<string>();
+    v.markets.currencies.forEach((c, i) => {
+      if (c.code === v.currency.code) ctx.addIssue({ code: "custom", path: ["markets", "currencies", i, "code"], message: "هذه هي العملة الأساسية — اختر عملة أخرى" });
+      else if (codes.has(c.code)) ctx.addIssue({ code: "custom", path: ["markets", "currencies", i, "code"], message: "العملة مكررة" });
+      codes.add(c.code);
+    });
+    if (v.markets.defaultCode && v.markets.defaultCode !== v.currency.code && !v.markets.currencies.some((c) => c.enabled && c.code === v.markets.defaultCode)) {
+      ctx.addIssue({ code: "custom", path: ["markets", "defaultCode"], message: "العملة الافتراضية يجب أن تكون مفعّلة" });
     }
     if (v.payments.transfer.enabled && v.payments.transfer.accounts.length === 0) {
       ctx.addIssue({ code: "custom", path: ["payments", "transfer", "accounts"], message: "أضف حساباً واحداً على الأقل لاستقبال الحوالات" });

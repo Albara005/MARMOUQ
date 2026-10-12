@@ -219,6 +219,8 @@ export const orders = pgTable(
     shippingFee: integer("shipping_fee").notNull().default(0),
     total: integer("total").notNull(),
     couponCode: text("coupon_code").notNull().default(""),
+    /** Currency the customer saw at checkout (snapshot incl. rate); null = base currency */
+    displayCurrency: jsonb("display_currency").$type<{ code: string; symbol: string; position: "after" | "before"; basePerUnit?: number; markup?: number; decimals?: 0 | 2; roundTo?: number } | null>(),
     shippingZoneId: integer("shipping_zone_id").references(() => shippingZones.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

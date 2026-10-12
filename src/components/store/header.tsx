@@ -9,6 +9,7 @@ import { MediaImage } from "@/components/ui/media-image";
 import { useCart, useWishlist } from "@/components/store/cart/cart-provider";
 import { MobileMenu } from "@/components/store/mobile-menu";
 import { SearchOverlay } from "@/components/store/search-overlay";
+import { CurrencySwitcher } from "@/components/store/currency-switcher";
 import { NAV_LINKS, categoryHref } from "@/components/store/nav";
 import type { MediaRef } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
@@ -185,6 +186,7 @@ export function Header({ categories }: { categories: NavCategory[] }) {
 
           {/* End: utilities */}
           <div className="flex items-center justify-end gap-0.5">
+            <CurrencySwitcher tone={light ? "light" : "dark"} className="hidden lg:inline-flex" />
             <button type="button" className={cn(iconBtn, "hidden lg:grid")} onClick={() => setSearchOpen(true)} aria-label="بحث (اختصار /)" aria-haspopup="dialog">
               <Search className="size-[1.2rem]" strokeWidth={1.5} aria-hidden />
             </button>

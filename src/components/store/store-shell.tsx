@@ -1,4 +1,4 @@
-import { getSettings, toPublicConfig } from "@/lib/settings";
+import { getDisplayCurrency, getSettings, toPublicConfig } from "@/lib/settings";
 import { listCategories, type CategoryData } from "@/lib/catalog";
 import { StoreConfigProvider } from "@/components/store/store-provider";
 import { CartProvider, WishlistProvider } from "@/components/store/cart/cart-provider";
@@ -15,6 +15,7 @@ import { RevealRoot } from "@/components/store/reveal";
  */
 export async function StoreShell({ children }: { children: React.ReactNode }) {
   const settings = await getSettings();
+  const display = await getDisplayCurrency(settings);
   let categories: CategoryData[] = [];
   try {
     categories = await listCategories();
@@ -25,7 +26,7 @@ export async function StoreShell({ children }: { children: React.ReactNode }) {
   const nav: NavCategory[] = categories.map((c) => ({ slug: c.slug, name: c.name, nameEn: c.nameEn, image: c.image, productCount: c.productCount }));
 
   return (
-    <StoreConfigProvider config={toPublicConfig(settings)}>
+    <StoreConfigProvider config={toPublicConfig(settings, display)}>
       <CartProvider>
         <WishlistProvider>
           <div className="flex min-h-dvh flex-col">
@@ -35,7 +36,14 @@ export async function StoreShell({ children }: { children: React.ReactNode }) {
             >
               تخطَّ إلى المحتوى
             </a>
-            <AnnouncementBar messages={settings.announcements} />
+            {settings.bars.announcement.enabled && (
+              <AnnouncementBar
+                messages={settings.announcements}
+                tone={settings.bars.announcement.tone}
+                href={settings.bars.announcement.href}
+                interval={settings.bars.announcement.interval}
+              />
+            )}
             <Header categories={nav} />
             <main id="main" className="flex-1">
               {children}

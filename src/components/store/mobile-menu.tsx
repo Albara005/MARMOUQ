@@ -7,6 +7,7 @@ import { Wordmark } from "@/components/ui/wordmark";
 import { MediaImage } from "@/components/ui/media-image";
 import { InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/ui/brand-icons";
 import { useStoreConfig } from "@/components/store/store-provider";
+import { CurrencySwitcher } from "@/components/store/currency-switcher";
 import { Portal, useModal, usePresence } from "@/components/store/overlay";
 import { NAV_LINKS, SERVICE_LINKS, categoryHref } from "@/components/store/nav";
 import type { NavCategory } from "@/components/store/header";
@@ -122,6 +123,12 @@ export function MobileMenu({
                   </li>
                 ))}
               </ul>
+              {config.currencyOptions.length > 0 && (
+                <div className="mt-5">
+                  <p className="mb-2 text-xs text-taupe">العملة</p>
+                  <CurrencySwitcher variant="full" />
+                </div>
+              )}
             </section>
           </div>
 

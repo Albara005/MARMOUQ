@@ -1,6 +1,6 @@
 import { Check, X } from "lucide-react";
 import type { CategoryData, ColorOption } from "@/lib/catalog";
-import { formatMoney, type Currency } from "@/lib/money";
+import { formatAmount, formatMoney, isForeign, type Currency } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { PriceForm, ShopLink } from "@/components/store/catalog/shop-nav";
 import { shopHref, type ShopParams } from "@/components/store/catalog/params";
@@ -20,15 +20,16 @@ export function carryParams(p: ShopParams, omit: (keyof ShopParams)[]): Record<s
 }
 
 /** Three honest price bands derived from the catalogue's real range. */
-function priceBands(lo: number, hi: number): { label: string; min: number | null; max: number | null }[] {
+function priceBands(lo: number, hi: number, currency?: Currency): { label: string; min: number | null; max: number | null }[] {
+  const n = (v: number) => (currency ? formatAmount(v, currency) : v.toLocaleString("en-US"));
   if (!hi || hi - lo < 4000) return [];
   const step = 5000;
   const a = Math.max(step, Math.round((lo + (hi - lo) / 3) / step) * step);
   const b = Math.max(a + step, Math.round((lo + ((hi - lo) * 2) / 3) / step) * step);
   return [
-    { label: `حتى ${a.toLocaleString("en-US")}`, min: null, max: a },
-    { label: `${a.toLocaleString("en-US")} – ${b.toLocaleString("en-US")}`, min: a, max: b },
-    { label: `أكثر من ${b.toLocaleString("en-US")}`, min: b, max: null },
+    { label: `حتى ${n(a)}`, min: null, max: a },
+    { label: `${n(a)} – ${n(b)}`, min: a, max: b },
+    { label: `أكثر من ${n(b)}`, min: b, max: null },
   ];
 }
 
@@ -65,7 +66,7 @@ export function FilterPanel({
   currency: Currency;
   idPrefix: string;
 }) {
-  const bands = priceBands(facets.priceMin, facets.priceMax);
+  const bands = priceBands(facets.priceMin, facets.priceMax, currency);
   const keep = (slug: string | null) => shopHref(slug ? `/shop/${slug}` : "/shop", { ...params, color: "", size: "", min: null, max: null });
   const priceActive = params.min != null || params.max != null;
 
@@ -214,7 +215,7 @@ export function FilterPanel({
             })}
           </ul>
         )}
-        <PriceForm
+        {!isForeign(currency) && <PriceForm
           base={base}
           hidden={carryParams(params, ["min", "max"])}
           min={params.min}
@@ -222,7 +223,7 @@ export function FilterPanel({
           placeholderMin={facets.priceMin}
           placeholderMax={facets.priceMax}
           idPrefix={idPrefix}
-        />
+        />}
         {facets.priceMax > 0 && (
           <p className="mt-3 text-[0.7rem] leading-5 text-mist">
             الأسعار في هذا القسم من {formatMoney(facets.priceMin, currency)} إلى {formatMoney(facets.priceMax, currency)}

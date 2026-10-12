@@ -180,6 +180,7 @@ export function CheckoutForm({ zones, payments }: { zones: ShippingZoneData[]; p
           notes: values.notes,
           paymentMethod: method,
           couponCode: coupon && !couponBlocked ? coupon.code : "",
+          currencyCode: config.currency.code,
           lines: cart.lines.map((l) => ({ variantId: l.variantId, quantity: l.quantity, lookId: l.lookId ?? null })),
         });
         if (res.ok) {

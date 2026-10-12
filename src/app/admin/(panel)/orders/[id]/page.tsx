@@ -93,7 +93,7 @@ export default async function OrderDetailPage({ params }: Props) {
     status: order.status,
     paymentMethod: order.paymentMethod,
     paymentStatus: order.paymentStatus,
-    totalLabel: money(order.total),
+    totalLabel: order.displayCurrency ? formatMoney(order.total, order.displayCurrency) : money(order.total),
     trackUrl,
     storeName: settings.storeName,
     instagramHandle: instagramHandle(settings.instagram),
@@ -228,6 +228,12 @@ export default async function OrderDetailPage({ params }: Props) {
                 <dt className="font-semibold text-espresso">الإجمالي</dt>
                 <dd className="text-xl font-semibold tabular-nums tracking-tight text-espresso">{money(order.total)}</dd>
               </div>
+              {order.displayCurrency && (
+                <div className="flex items-baseline justify-between gap-4 rounded-xl bg-copper/10 px-3 py-2.5">
+                  <dt className="text-sm text-copper-deep">المبلغ بعملة العميل ({order.displayCurrency.code})</dt>
+                  <dd className="text-lg font-semibold tabular-nums text-copper-deep">{formatMoney(order.total, order.displayCurrency)}</dd>
+                </div>
+              )}
             </dl>
           </Card>
 

@@ -18,9 +18,9 @@ import {
   type PaymentStatus,
 } from "@/db/schema";
 import { computeTotals, lineKey, type CouponRule, type LookRule } from "@/lib/pricing";
-import { getSettings } from "@/lib/settings";
+import { getSettings, resolveDisplayCurrency } from "@/lib/settings";
 import { normalizePhone, randomToken } from "@/lib/utils";
-import { formatMoney } from "@/lib/money";
+import { formatMoney, isForeign } from "@/lib/money";
 import { notifyTelegram } from "@/lib/notify";
 import { STOCK_HOLDING, ORDER_STATUS_META } from "@/lib/order-status";
 
@@ -38,6 +38,8 @@ export const checkoutSchema = z.object({
   notes: z.string().trim().max(500).optional().default(""),
   paymentMethod: z.enum(["cod", "transfer"]),
   couponCode: z.string().trim().max(40).optional().default(""),
+  /** Display currency chosen by the customer (validated against settings server-side) */
+  currencyCode: z.string().trim().max(8).optional().default(""),
   lines: z
     .array(
       z.object({
@@ -93,6 +95,7 @@ export async function placeOrder(raw: unknown): Promise<PlaceOrderResult> {
   }
   const input = parsed.data;
   const settings = await getSettings();
+  const display = resolveDisplayCurrency(settings, input.currencyCode || settings.currency.code);
   if (input.paymentMethod === "cod" && !settings.payments.cod.enabled) return { ok: false, error: "طريقة الدفع غير متاحة" };
   if (input.paymentMethod === "transfer" && !settings.payments.transfer.enabled) return { ok: false, error: "طريقة الدفع غير متاحة" };
 
@@ -196,6 +199,7 @@ export async function placeOrder(raw: unknown): Promise<PlaceOrderResult> {
           shippingFee: totals.shipping,
           total: totals.total,
           couponCode: couponRow?.code ?? "",
+          displayCurrency: isForeign(display) ? display : null,
           shippingZoneId: zone.id,
         })
         .returning({ id: orders.id });
@@ -247,7 +251,7 @@ export async function placeOrder(raw: unknown): Promise<PlaceOrderResult> {
     });
 
     void notifyTelegram(
-      `🛍️ طلب جديد ${result.number}\n👤 ${input.name} — ${input.phone}\n📍 ${result.zone}\n🧾 ${result.itemsCount} قطعة · ${formatMoney(result.total, settings.currency)}\n💳 ${input.paymentMethod === "cod" ? "عند الاستلام" : "حوالة"}`,
+      `🛍️ طلب جديد ${result.number}\n👤 ${input.name} — ${input.phone}\n📍 ${result.zone}\n🧾 ${result.itemsCount} قطعة · ${formatMoney(result.total, settings.currency)}${isForeign(display) ? ` (${formatMoney(result.total, display)})` : ""}\n💳 ${input.paymentMethod === "cod" ? "عند الاستلام" : "حوالة"}`,
     );
     return { ok: true, number: result.number, token: result.token };
   } catch (err) {

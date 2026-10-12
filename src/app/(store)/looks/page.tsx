@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, Sparkles } from "lucide-react";
-import { getSettings } from "@/lib/settings";
+import { getDisplayCurrency, getSettings } from "@/lib/settings";
 import { listCategories, listLooks, type LookData } from "@/lib/catalog";
 import { LookHotspots } from "@/components/store/look-hotspots";
 import { AddLookButton } from "@/components/store/add-look-dialog";
@@ -22,6 +22,7 @@ export const metadata: Metadata = {
 
 export default async function LooksPage() {
   const [settings, looks, categories] = await Promise.all([getSettings(), listLooks(24), listCategories()]);
+  const displayCurrency = await getDisplayCurrency(settings);
   const ready = looks.filter((l) => l.items.length > 0);
   const maxDiscount = ready.reduce((m, l) => Math.max(m, l.discountPercent), 0);
 
@@ -109,7 +110,7 @@ export default async function LooksPage() {
         </section>
       ) : (
         ready.map((look, i) => (
-          <LookSpread key={look.id} look={look} index={i} currency={settings.currency} atelierHref={atelierHrefForLook(look, categories)} />
+          <LookSpread key={look.id} look={look} index={i} currency={displayCurrency} atelierHref={atelierHrefForLook(look, categories)} />
         ))
       )}
 

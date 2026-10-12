@@ -48,7 +48,7 @@ export default async function OrderConfirmationPage({ params, searchParams }: Pr
   const [order, settings] = await Promise.all([getOrderByToken(orderNumber, token), getSettings()]);
   if (!order) notFound();
 
-  const money = (n: number) => formatMoney(n, settings.currency);
+  const money = (n: number) => formatMoney(n, order.displayCurrency ?? settings.currency);
   const name = firstName(order.customerName);
   const terminal = order.status === "cancelled" || order.status === "returned";
   const itemsCount = order.items.reduce((s, i) => s + i.quantity, 0);

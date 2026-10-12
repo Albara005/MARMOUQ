@@ -14,7 +14,7 @@ import { AtelierBand, type AtelierSlot } from "@/components/store/home/atelier-b
 export const dynamic = "force-dynamic";
 
 const SIGNATURE_SLUG = "half-zip-cable-knit-sweater";
-const VALUES = ["قطن 100%", "صنع إيطالي 🇮🇹", "قصّات مدروسة", "توصيل لكل المحافظات", "الدفع عند الاستلام", "استبدال سهل"];
+const MARQUEE_TONE = { ivory: "light", espresso: "dark", copper: "copper", burgundy: "burgundy", navy: "navy" } as const;
 const SLOT_LABELS: Record<string, string> = { knit: "التريكو", shirt: "القميص", tie: "الربطة", trousers: "البنطال", shoes: "الحذاء" };
 const SLOT_ORDER = ["knit", "shirt", "tie", "trousers", "shoes"];
 const slotRank = (slot: string) => (SLOT_ORDER.includes(slot) ? SLOT_ORDER.indexOf(slot) : 99);
@@ -87,6 +87,7 @@ export default async function HomePage() {
   for (const p of products) pushMedia(p.images[0]);
 
   const featuredLook = looks.find((l) => l.items.length > 0) ?? null;
+  const show = settings.home.sections;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -115,22 +116,22 @@ export default async function HomePage() {
       />
 
       <div id="home-after-hero" className="scroll-mt-20">
-        <Marquee items={VALUES} />
+        {settings.bars.marquee.enabled && <Marquee items={settings.bars.marquee.items} tone={MARQUEE_TONE[settings.bars.marquee.tone] ?? "light"} speed={settings.bars.marquee.speed} />}
       </div>
 
-      <CategoriesGrid categories={categories} fallbacks={fallbacks} />
+      {show.categories && <CategoriesGrid categories={categories} fallbacks={fallbacks} />}
 
-      {signature && signature.colors.length >= 2 && <ColourStory product={signature} />}
+      {show.colourStory && signature && signature.colors.length >= 2 && <ColourStory product={signature} />}
 
-      <NewArrivals products={products} />
+      {show.newArrivals && <NewArrivals products={products} />}
 
-      {featuredLook && <LookOfSeason look={featuredLook} />}
+      {show.look && featuredLook && <LookOfSeason look={featuredLook} />}
 
-      <CraftValues />
+      {show.craft && <CraftValues />}
 
-      <SocialProof testimonials={settings.testimonials} instagram={settings.instagram} gallery={gallery} />
+      {show.social && <SocialProof testimonials={settings.testimonials} instagram={settings.instagram} gallery={gallery} />}
 
-      <AtelierBand slots={slots} />
+      {show.atelier && <AtelierBand slots={slots} />}
     </>
   );
 }

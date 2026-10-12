@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { CreditCard, FileText, Globe, House, Search, Store, Truck, CircleAlert } from "lucide-react";
-import type { StoreSettings } from "@/lib/settings";
+import { Coins, CreditCard, FileText, Globe, House, Megaphone, Plus, Search, Store, Truck, CircleAlert } from "lucide-react";
+import type { BarTone, HomeSectionKey, MarketCurrency, StoreSettings } from "@/lib/settings";
 import type { MediaLike } from "@/components/ui/media-image";
-import { formatMoney } from "@/lib/money";
+import { formatMoney, type Currency } from "@/lib/money";
 import { cn, whatsappLink } from "@/lib/utils";
 import { Input, Label, Select, Switch, Textarea } from "@/components/ui/field";
 import { ActionFieldError, ActionForm, ActionFormError, SubmitButton, useActionFormState } from "@/components/admin/ui-client";
@@ -12,10 +12,12 @@ import { ImageUploader } from "@/components/admin/image-uploader";
 import { saveSettingsAction } from "@/app/admin/(panel)/settings/actions";
 import { ListEditor } from "./list-editors";
 
-type TabId = "identity" | "home" | "payments" | "shipping" | "policies" | "seo";
+type TabId = "identity" | "home" | "bars" | "markets" | "payments" | "shipping" | "policies" | "seo";
 const TABS: { id: TabId; label: string; icon: typeof Store; prefixes: string[] }[] = [
   { id: "identity", label: "الهوية والتواصل", icon: Store, prefixes: ["storeName", "storeNameEn", "tagline", "description", "whatsapp", "phone", "email", "instagram", "tiktok", "address", "workingHours"] },
-  { id: "home", label: "الواجهة الرئيسية", icon: House, prefixes: ["hero", "announcements", "testimonials"] },
+  { id: "home", label: "الواجهة الرئيسية", icon: House, prefixes: ["hero", "testimonials"] },
+  { id: "bars", label: "الأشرطة والأقسام", icon: Megaphone, prefixes: ["bars", "announcements", "home"] },
+  { id: "markets", label: "العملات والأسواق", icon: Coins, prefixes: ["markets"] },
   { id: "payments", label: "المدفوعات", icon: CreditCard, prefixes: ["payments"] },
   { id: "shipping", label: "الشحن والعملة", icon: Truck, prefixes: ["currency", "freeShippingThreshold", "lowStockThreshold"] },
   { id: "policies", label: "السياسات", icon: FileText, prefixes: ["policies"] },
@@ -80,6 +82,8 @@ export function SettingsForm({ initial, heroMedia, initialTab }: { initial: Stor
 
   const set = <K extends keyof StoreSettings>(k: K, v: StoreSettings[K]) => setS((p) => ({ ...p, [k]: v }));
   const setIn = <K extends "hero" | "currency" | "policies" | "seo">(k: K, patch: Partial<StoreSettings[K]>) => setS((p) => ({ ...p, [k]: { ...p[k], ...patch } }));
+  const setBar = <K extends "announcement" | "marquee">(k: K, patch: Partial<StoreSettings["bars"][K]>) =>
+    setS((p) => ({ ...p, bars: { ...p.bars, [k]: { ...p.bars[k], ...patch } } }));
   const setPay = (k: "cod" | "transfer", patch: Partial<StoreSettings["payments"]["transfer"]>) =>
     setS((p) => ({ ...p, payments: { ...p.payments, [k]: { ...p.payments[k], ...patch } } }));
 
@@ -248,28 +252,6 @@ export function SettingsForm({ initial, heroMedia, initialTab }: { initial: Stor
                 />
                 <ActionFieldError name="hero.mediaId" />
               </div>
-            </Section>
-
-            <Section title="شريط الإعلانات" description="رسائل قصيرة تتناوب أعلى المتجر. الترتيب هنا هو ترتيب الظهور.">
-              <div className="mb-4 overflow-hidden rounded-lg bg-espresso px-4 py-2 text-center text-[0.72rem] text-paper/90" aria-hidden>
-                {s.announcements.length ? s.announcements.join("  ✦  ") : "لن يظهر الشريط"}
-              </div>
-              <ListEditor
-                items={s.announcements}
-                onChange={(v) => set("announcements", v)}
-                create={() => ""}
-                max={8}
-                addLabel="إضافة رسالة"
-                emptyLabel="لا رسائل — سيختفي الشريط من المتجر."
-                itemLabel={(i) => `الرسالة ${i + 1}`}
-                render={(item, update, i) => (
-                  <>
-                    <label htmlFor={`s-ann-${i}`} className="sr-only">{`الرسالة ${i + 1}`}</label>
-                    <Input id={`s-ann-${i}`} className="h-10 text-sm" value={item} maxLength={120} onChange={(e) => update(e.target.value)} placeholder="مثلاً: توصيل مجاني للطلبات فوق 60,000 ر.ي" />
-                    <ActionFieldError name={`announcements.${i}`} />
-                  </>
-                )}
-              />
             </Section>
 
             <Section title="آراء العملاء" description="شهادات حقيقية من عملائك تظهر في الصفحة الرئيسية.">
@@ -463,6 +445,143 @@ export function SettingsForm({ initial, heroMedia, initialTab }: { initial: Stor
               </div>
             </Section>
           </div>
+
+          <div role="tabpanel" id="panel-bars" aria-labelledby="tab-bars" hidden={tab !== "bars"} className="space-y-5">
+            <Section
+              title="شريط الإعلانات (أعلى المتجر)"
+              description="رسائل قصيرة تتناوب أعلى كل الصفحات. الترتيب هنا هو ترتيب الظهور."
+              aside={<Switch checked={s.bars.announcement.enabled} onChange={(e) => setBar("announcement", { enabled: e.target.checked })} label="ظاهر" />}
+            >
+              <div className="mb-4 grid gap-4 sm:grid-cols-3">
+                <F label="اللون" name="bars.announcement.tone">
+                  <TonePicker value={s.bars.announcement.tone} onChange={(tone) => setBar("announcement", { tone })} />
+                </F>
+                <F label="رابط عند الضغط (اختياري)" name="bars.announcement.href" hint="/shop أو رابط كامل">
+                  <Input id="s-bars.announcement.href" dir="ltr" className={inputSm} value={s.bars.announcement.href} onChange={(e) => setBar("announcement", { href: e.target.value })} placeholder="/shop" />
+                </F>
+                <F label="مدة كل رسالة (ثانية)" name="bars.announcement.interval">
+                  <Input id="s-bars.announcement.interval" type="number" min={2} max={30} className={inputSm} value={s.bars.announcement.interval} onChange={(e) => setBar("announcement", { interval: Number(e.target.value) || 5 })} />
+                </F>
+              </div>
+              <div className={cn("mb-4 overflow-hidden rounded-lg px-4 py-2 text-center text-[0.72rem]", TONE_PREVIEW[s.bars.announcement.tone])} aria-hidden>
+                {s.announcements.length ? s.announcements.join("  ✦  ") : "لن يظهر الشريط"}
+              </div>
+              <ListEditor
+                items={s.announcements}
+                onChange={(v) => set("announcements", v)}
+                create={() => ""}
+                max={8}
+                addLabel="إضافة رسالة"
+                emptyLabel="لا رسائل — سيختفي الشريط من المتجر."
+                itemLabel={(i) => `الرسالة ${i + 1}`}
+                render={(item, update, i) => (
+                  <>
+                    <label htmlFor={`s-ann-${i}`} className="sr-only">{`الرسالة ${i + 1}`}</label>
+                    <Input id={`s-ann-${i}`} className="h-10 text-sm" value={item} maxLength={120} onChange={(e) => update(e.target.value)} placeholder="مثلاً: توصيل مجاني للطلبات فوق 60,000 ر.ي" />
+                    <ActionFieldError name={`announcements.${i}`} />
+                  </>
+                )}
+              />
+            </Section>
+
+
+            <Section
+              title="الشريط المتحرك (الصفحة الرئيسية)"
+              description="عبارات قصيرة تتحرك تحت الواجهة الرئيسية — قيم المتجر أو عروضه."
+              aside={<Switch checked={s.bars.marquee.enabled} onChange={(e) => setBar("marquee", { enabled: e.target.checked })} label="ظاهر" />}
+            >
+              <div className={cn("mb-4 overflow-hidden whitespace-nowrap rounded-lg px-4 py-2.5 text-center text-[0.8rem]", TONE_PREVIEW[s.bars.marquee.tone])} aria-hidden>
+                {s.bars.marquee.items.length ? s.bars.marquee.items.join("  ✦  ") : "لن يظهر الشريط"}
+              </div>
+              <div className="mb-4 grid gap-4 sm:grid-cols-2">
+                <F label="اللون" name="bars.marquee.tone">
+                  <TonePicker value={s.bars.marquee.tone} onChange={(tone) => setBar("marquee", { tone })} />
+                </F>
+                <F label="سرعة الحركة (ثوانٍ للدورة — الأقل أسرع)" name="bars.marquee.speed">
+                  <Input id="s-bars.marquee.speed" type="number" min={10} max={120} className={inputSm} value={s.bars.marquee.speed} onChange={(e) => setBar("marquee", { speed: Number(e.target.value) || 38 })} />
+                </F>
+              </div>
+              <ListEditor
+                items={s.bars.marquee.items}
+                onChange={(items) => setBar("marquee", { items })}
+                create={() => ""}
+                max={12}
+                addLabel="إضافة عبارة"
+                emptyLabel="لا عبارات — سيختفي الشريط."
+                itemLabel={(i) => `العبارة ${i + 1}`}
+                render={(item, update, i) => (
+                  <>
+                    <label htmlFor={`s-mq-${i}`} className="sr-only">{`العبارة ${i + 1}`}</label>
+                    <Input id={`s-mq-${i}`} className="h-10 text-sm" value={item} maxLength={60} onChange={(e) => update(e.target.value)} placeholder="مثلاً: شحن دولي لدول الخليج" />
+                    <ActionFieldError name={`bars.marquee.items.${i}`} />
+                  </>
+                )}
+              />
+            </Section>
+
+            <Section title="أقسام الصفحة الرئيسية" description="أظهر أو أخفِ أي قسم من الصفحة الرئيسية.">
+              <ul className="grid gap-3 sm:grid-cols-2">
+                {(Object.keys(SECTION_LABELS) as HomeSectionKey[]).map((k) => (
+                  <li key={k} className="rounded-xl border border-line bg-ivory px-4 py-3">
+                    <Switch
+                      checked={s.home.sections[k]}
+                      onChange={(e) => setS((p) => ({ ...p, home: { ...p.home, sections: { ...p.home.sections, [k]: e.target.checked } } }))}
+                      label={SECTION_LABELS[k]}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          </div>
+
+          <div role="tabpanel" id="panel-markets" aria-labelledby="tab-markets" hidden={tab !== "markets"} className="space-y-5">
+            <Section
+              title="البيع الدولي بعملات متعددة"
+              description={`أسعار المنتجات تُدخل وتُحفظ بالعملة الأساسية (${s.currency.code}). أضف عملات للعملاء خارج اليمن، وحدّد سعر الصرف ونسبة إضافية لكل سوق — والمتجر يحوّل كل الأسعار تلقائياً.`}
+              aside={<Switch checked={s.markets.switcher} onChange={(e) => setS((p) => ({ ...p, markets: { ...p.markets, switcher: e.target.checked } }))} label="إظهار مبدّل العملة" />}
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
+                <F label="العملة الافتراضية للزوار" name="markets.defaultCode" hint="ما يراه الزائر لأول مرة قبل أن يختار.">
+                  <Select id="s-markets.defaultCode" className={inputSm} value={s.markets.defaultCode} onChange={(e) => setS((p) => ({ ...p, markets: { ...p.markets, defaultCode: e.target.value } }))}>
+                    <option value="">{`العملة الأساسية (${s.currency.code})`}</option>
+                    {s.markets.currencies
+                      .filter((c) => c.enabled && c.code)
+                      .map((c) => (
+                        <option key={c.code} value={c.code}>{`${c.label || c.code} (${c.code})`}</option>
+                      ))}
+                  </Select>
+                </F>
+                <div>
+                  <p className="mb-1.5 text-sm font-medium text-umber">إضافة سريعة</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {CURRENCY_PRESETS.filter((p) => p.code !== s.currency.code && !s.markets.currencies.some((c) => c.code === p.code)).map((p) => (
+                      <button
+                        key={p.code}
+                        type="button"
+                        onClick={() => setS((prev) => ({ ...prev, markets: { ...prev.markets, currencies: [...prev.markets.currencies, { ...p, basePerUnit: 0, markup: 0, enabled: true }] } }))}
+                        className="inline-flex h-8 items-center gap-1 rounded-full bg-bone px-3 text-xs text-umber hover:bg-sand"
+                      >
+                        <Plus className="size-3" aria-hidden /> {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </Section>
+
+            <Section title="العملات" description="لكل عملة: كم تساوي بالعملة الأساسية، ونسبة إضافية اختيارية لذلك السوق (رسوم أو شحن دولي)، وطريقة التقريب.">
+              <ListEditor
+                items={s.markets.currencies}
+                onChange={(currencies) => setS((p) => ({ ...p, markets: { ...p.markets, currencies } }))}
+                create={(): MarketCurrency => ({ code: "", symbol: "", label: "", position: "after", basePerUnit: 0, markup: 0, decimals: 0, roundTo: 1, enabled: true })}
+                max={12}
+                addLabel="إضافة عملة"
+                emptyLabel="لا عملات إضافية — المتجر يعرض الأسعار بالعملة الأساسية فقط."
+                itemLabel={(i) => `العملة ${i + 1}`}
+                render={(c, update, i) => <CurrencyRow c={c} update={update} i={i} base={s.currency} />}
+              />
+            </Section>
+          </div>
         </div>
       </div>
 
@@ -506,5 +625,135 @@ export function SettingsForm({ initial, heroMedia, initialTab }: { initial: Stor
         </div>
       </div>
     </ActionForm>
+  );
+}
+
+/* ─────────── bars & markets helpers ─────────── */
+
+const TONE_PREVIEW: Record<BarTone, string> = {
+  espresso: "bg-espresso text-paper/90",
+  copper: "bg-copper text-paper",
+  burgundy: "bg-burgundy text-paper/90",
+  navy: "bg-navy text-paper/90",
+  ivory: "bg-bone text-espresso border border-line",
+};
+const TONE_LABELS: Record<BarTone, string> = { espresso: "إسبريسو", copper: "نحاسي", burgundy: "برغندي", navy: "كحلي", ivory: "عاجي" };
+
+function TonePicker({ value, onChange }: { value: BarTone; onChange: (t: BarTone) => void }) {
+  return (
+    <div className="flex flex-wrap gap-2" role="radiogroup">
+      {(Object.keys(TONE_PREVIEW) as BarTone[]).map((t) => (
+        <button
+          key={t}
+          type="button"
+          role="radio"
+          aria-checked={value === t}
+          title={TONE_LABELS[t]}
+          onClick={() => onChange(t)}
+          className={cn("size-9 rounded-full ring-offset-2 ring-offset-paper transition-shadow", TONE_PREVIEW[t], value === t ? "ring-2 ring-copper" : "ring-1 ring-line")}
+        >
+          <span className="sr-only">{TONE_LABELS[t]}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const SECTION_LABELS: Record<HomeSectionKey, string> = {
+  categories: "شبكة الأقسام",
+  colourStory: "قصة الألوان",
+  newArrivals: "وصل حديثاً",
+  look: "إطلالة الموسم",
+  craft: "تفاصيل مختارة بعناية",
+  social: "آراء العملاء وإنستغرام",
+  atelier: "دعوة منسّق الإطلالة",
+};
+
+const CURRENCY_PRESETS: Omit<MarketCurrency, "basePerUnit" | "markup" | "enabled">[] = [
+  { code: "SAR", symbol: "ر.س", label: "ريال سعودي", position: "after", decimals: 0, roundTo: 1 },
+  { code: "AED", symbol: "د.إ", label: "درهم إماراتي", position: "after", decimals: 0, roundTo: 1 },
+  { code: "OMR", symbol: "ر.ع", label: "ريال عماني", position: "after", decimals: 2, roundTo: 0 },
+  { code: "QAR", symbol: "ر.ق", label: "ريال قطري", position: "after", decimals: 0, roundTo: 1 },
+  { code: "KWD", symbol: "د.ك", label: "دينار كويتي", position: "after", decimals: 2, roundTo: 0 },
+  { code: "BHD", symbol: "د.ب", label: "دينار بحريني", position: "after", decimals: 2, roundTo: 0 },
+  { code: "USD", symbol: "$", label: "دولار أمريكي", position: "before", decimals: 2, roundTo: 0 },
+  { code: "EUR", symbol: "€", label: "يورو", position: "before", decimals: 2, roundTo: 0 },
+  { code: "GBP", symbol: "£", label: "جنيه إسترليني", position: "before", decimals: 2, roundTo: 0 },
+  { code: "EGP", symbol: "ج.م", label: "جنيه مصري", position: "after", decimals: 0, roundTo: 5 },
+  { code: "YER", symbol: "ر.ي", label: "ريال يمني", position: "after", decimals: 0, roundTo: 1 },
+];
+
+function CurrencyRow({ c, update, i, base }: { c: MarketCurrency; update: (next: MarketCurrency) => void; i: number; base: Currency }) {
+  const sample = 25000;
+  const preview: Currency = { code: c.code, symbol: c.symbol || c.code, position: c.position, basePerUnit: c.basePerUnit, markup: c.markup, decimals: c.decimals, roundTo: c.roundTo };
+  const p = `markets.currencies.${i}`;
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div>
+          <label htmlFor={`s-${p}.code`} className="mb-1 block text-xs text-taupe">الرمز</label>
+          <Input id={`s-${p}.code`} dir="ltr" className="h-10 text-sm uppercase" maxLength={3} value={c.code} onChange={(e) => update({ ...c, code: e.target.value.toUpperCase() })} placeholder="SAR" />
+          <ActionFieldError name={`${p}.code`} />
+        </div>
+        <div>
+          <label htmlFor={`s-${p}.symbol`} className="mb-1 block text-xs text-taupe">العلامة</label>
+          <Input id={`s-${p}.symbol`} className="h-10 text-sm" maxLength={8} value={c.symbol} onChange={(e) => update({ ...c, symbol: e.target.value })} placeholder="ر.س" />
+          <ActionFieldError name={`${p}.symbol`} />
+        </div>
+        <div className="col-span-2">
+          <label htmlFor={`s-${p}.label`} className="mb-1 block text-xs text-taupe">الاسم الظاهر للعميل</label>
+          <Input id={`s-${p}.label`} className="h-10 text-sm" maxLength={30} value={c.label} onChange={(e) => update({ ...c, label: e.target.value })} placeholder="ريال سعودي" />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="col-span-2">
+          <label htmlFor={`s-${p}.basePerUnit`} className="mb-1 block text-xs text-taupe">{`سعر الصرف: 1 ${c.code || "…"} = كم ${base.symbol}`}</label>
+          <Input id={`s-${p}.basePerUnit`} type="number" min={0} step="any" className="h-10 text-sm" value={c.basePerUnit || ""} onChange={(e) => update({ ...c, basePerUnit: Number(e.target.value) || 0 })} placeholder="140" />
+          <ActionFieldError name={`${p}.basePerUnit`} />
+        </div>
+        <div>
+          <label htmlFor={`s-${p}.markup`} className="mb-1 block text-xs text-taupe">نسبة إضافية %</label>
+          <Input id={`s-${p}.markup`} type="number" step="any" className="h-10 text-sm" value={c.markup} onChange={(e) => update({ ...c, markup: Number(e.target.value) || 0 })} />
+          <ActionFieldError name={`${p}.markup`} />
+        </div>
+        <div>
+          <label htmlFor={`s-${p}.round`} className="mb-1 block text-xs text-taupe">التقريب</label>
+          <Select
+            id={`s-${p}.round`}
+            className="h-10 text-sm"
+            value={`${c.decimals}:${c.roundTo}`}
+            onChange={(e) => {
+              const [d, r] = e.target.value.split(":").map(Number);
+              update({ ...c, decimals: d === 2 ? 2 : 0, roundTo: r });
+            }}
+          >
+            <option value="2:0">بالهللات (12.50)</option>
+            <option value="0:1">لأقرب 1</option>
+            <option value="0:5">لأقرب 5</option>
+            <option value="0:10">لأقرب 10</option>
+            <option value="0:50">لأقرب 50</option>
+            <option value="0:100">لأقرب 100</option>
+          </Select>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-4">
+          <Switch checked={c.enabled} onChange={(e) => update({ ...c, enabled: e.target.checked })} label="مفعّلة" />
+          <Select className="h-9 w-36 text-xs" value={c.position} onChange={(e) => update({ ...c, position: e.target.value as "after" | "before" })} aria-label="موضع العلامة">
+            <option value="after">العلامة بعد الرقم</option>
+            <option value="before">العلامة قبل الرقم</option>
+          </Select>
+        </div>
+        <p className="text-xs text-taupe">
+          {c.basePerUnit > 0 ? (
+            <>
+              منتج بـ {formatMoney(sample, base)} يظهر: <span className="font-semibold text-espresso">{formatMoney(sample, preview)}</span>
+            </>
+          ) : (
+            "أدخل سعر الصرف لرؤية المعاينة"
+          )}
+        </p>
+      </div>
+    </div>
   );
 }

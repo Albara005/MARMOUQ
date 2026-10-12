@@ -1,5 +1,7 @@
 import { cn } from "@/lib/utils";
 
+const FADE = { light: "from-paper", dark: "from-espresso", copper: "from-copper", burgundy: "from-burgundy", navy: "from-navy" } as const;
+
 /**
  * Endless ticker band (pure CSS). Moves left → right, the natural reading drift for RTL.
  * Content is duplicated for a seamless loop; the copy is hidden from assistive tech.
@@ -11,7 +13,7 @@ export function Marquee({
   speed = 38,
 }: {
   items: string[];
-  tone?: "light" | "dark" | "copper";
+  tone?: "light" | "dark" | "copper" | "burgundy" | "navy";
   className?: string;
   /** seconds per loop */
   speed?: number;
@@ -39,6 +41,8 @@ export function Marquee({
         tone === "light" && "border-line bg-paper text-umber",
         tone === "dark" && "border-cocoa bg-espresso text-paper/85",
         tone === "copper" && "border-copper-deep bg-copper text-paper",
+        tone === "burgundy" && "border-burgundy bg-burgundy text-paper/90",
+        tone === "navy" && "border-navy bg-navy text-paper/90",
         className,
       )}
     >
@@ -50,14 +54,14 @@ export function Marquee({
       <div
         className={cn(
           "pointer-events-none absolute inset-y-0 start-0 w-16 bg-gradient-to-l to-transparent md:w-32",
-          tone === "light" ? "from-paper" : tone === "dark" ? "from-espresso" : "from-copper",
+          FADE[tone],
         )}
         aria-hidden
       />
       <div
         className={cn(
           "pointer-events-none absolute inset-y-0 end-0 w-16 bg-gradient-to-r to-transparent md:w-32",
-          tone === "light" ? "from-paper" : tone === "dark" ? "from-espresso" : "from-copper",
+          FADE[tone],
         )}
         aria-hidden
       />

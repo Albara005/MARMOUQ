@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, FileText, RefreshCcw, ShieldCheck, Truck } from "lucide-react";
-import { getSettings, type StoreSettings } from "@/lib/settings";
+import { getDisplayCurrency, getSettings, type StoreSettings } from "@/lib/settings";
 import { listShippingZones } from "@/lib/catalog";
 import { formatMoney } from "@/lib/money";
 import { PageHeader } from "@/components/store/page-header";
@@ -54,7 +54,8 @@ export default async function PolicyPage({ params }: Props) {
   const [settings, zones] = await Promise.all([getSettings(), slug === "shipping" ? listShippingZones() : Promise.resolve([])]);
   const meta = POLICIES[slug];
   const blocks = toBlocks(settings.policies[slug] || "");
-  const money = (n: number) => formatMoney(n, settings.currency);
+  const displayCurrency = await getDisplayCurrency(settings);
+  const money = (n: number) => formatMoney(n, displayCurrency);
   const contactHref = "/contact";
 
   return (

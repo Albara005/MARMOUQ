@@ -5,7 +5,7 @@ import { Search } from "lucide-react";
 import { and, eq, gt, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { productVariants } from "@/db/schema";
-import { getSettings } from "@/lib/settings";
+import { getDisplayCurrency, getSettings } from "@/lib/settings";
 import { getFilterFacets, listCategories, listLooks, listProducts, type CategoryData, type LookData, type ProductCardData } from "@/lib/catalog";
 import { PageHeader } from "@/components/store/page-header";
 import { ProductCard } from "@/components/store/product-card";
@@ -117,7 +117,8 @@ export async function ShopView({ category, params }: { category: CategoryData | 
     </p>
   );
 
-  const panelProps = { params, base, category, categories, allCount, facets: { ...facets, sizes: orderSizes(facets.sizes) }, currency: settings.currency };
+  const displayCurrency = await getDisplayCurrency(settings);
+  const panelProps = { params, base, category, categories, allCount, facets: { ...facets, sizes: orderSizes(facets.sizes) }, currency: displayCurrency };
   const crumbs = [
     { label: "الرئيسية", href: "/" },
     { label: "المتجر", href: "/shop" },
@@ -223,7 +224,7 @@ export async function ShopView({ category, params }: { category: CategoryData | 
               <SortSelect base={base} hidden={carryParams(params, ["sort"])} value={params.sort} />
             </div>
           </div>
-          <ActiveFilters params={params} base={base} currency={settings.currency} className="mt-4" />
+          <ActiveFilters params={params} base={base} currency={displayCurrency} className="mt-4" />
 
           <ResultsVeil className="mt-6 lg:mt-8">
             {total === 0 ? (

@@ -10,7 +10,7 @@ import {
   Plus,
   Sparkles,
 } from "lucide-react";
-import { getSettings } from "@/lib/settings";
+import { getDisplayCurrency, getSettings } from "@/lib/settings";
 import { listShippingZones } from "@/lib/catalog";
 import { formatMoney } from "@/lib/money";
 import { whatsappLink, cn } from "@/lib/utils";
@@ -51,7 +51,8 @@ type Faq = { q: string; a: React.ReactNode; plain: string };
 
 export default async function ContactPage() {
   const [s, zones] = await Promise.all([getSettings(), listShippingZones()]);
-  const money = (n: number) => formatMoney(n, s.currency);
+  const displayCurrency = await getDisplayCurrency(s);
+  const money = (n: number) => formatMoney(n, displayCurrency);
 
   /* ───────── Contact cards (empty settings are hidden) ───────── */
   const primary: Card | null = s.whatsapp
