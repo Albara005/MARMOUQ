@@ -11,6 +11,8 @@ import { normalizePhone } from "@/lib/utils";
 import { COPY_GROUPS } from "@/lib/copy";
 import { blockMediaIds, type Block } from "@/lib/blocks";
 import { SIZE_GUIDE_LIMITS } from "@/lib/size-guides";
+import { refreshFxNow } from "@/lib/fx";
+import { CURRENCY_CATALOG } from "@/lib/currency-catalog";
 import { customPagesSchema, layoutsSchema } from "@/lib/blocks-schema";
 import { actionError, actionOk, zodFieldErrors, type ActionResult } from "@/components/admin/action-result";
 
@@ -118,7 +120,9 @@ const settingsSchema = z
     seo: z.object({ title: required(5, 80, "عنوان الصفحة مطلوب"), description: text(200) }),
     markets: z.object({
       switcher: z.boolean(),
+      autoDetect: z.boolean(),
       defaultCode: z.string().trim().toUpperCase().max(3),
+      usdRate: z.coerce.number({ message: "أدخل رقماً" }).min(0, "لا يقبل قيمة سالبة").max(10_000_000, "القيمة كبيرة جداً"),
       currencies: z
         .array(
           z.object({
@@ -130,7 +134,8 @@ const settingsSchema = z
             symbol: required(1, 8, "رمز العملة مطلوب"),
             label: text(30),
             position: z.enum(["after", "before"]),
-            basePerUnit: z.coerce.number({ message: "أدخل سعر الصرف" }).positive("سعر الصرف يجب أن يكون أكبر من صفر").max(1_000_000_000),
+            basePerUnit: z.coerce.number({ message: "أدخل سعر الصرف" }).min(0).max(1_000_000_000),
+            rateMode: z.enum(["auto", "manual"]).catch("auto"),
             markup: z.coerce.number({ message: "أدخل نسبة" }).min(-50, "أقل نسبة -50%").max(300, "أعلى نسبة 300%"),
             decimals: z.union([z.literal(0), z.literal(2)]),
             roundTo: z.coerce.number({ message: "أدخل رقماً" }).min(0).max(100_000),
@@ -234,6 +239,7 @@ const settingsSchema = z
     }
     const codes = new Set<string>();
     v.markets.currencies.forEach((c, i) => {
+      if (c.rateMode === "manual" && !(c.basePerUnit > 0)) ctx.addIssue({ code: "custom", path: ["markets", "currencies", i, "basePerUnit"], message: "اكتب سعر الصرف اليدوي أو اختر «تلقائي»" });
       if (c.code === v.currency.code) ctx.addIssue({ code: "custom", path: ["markets", "currencies", i, "code"], message: "هذه هي العملة الأساسية — اختر عملة أخرى" });
       else if (codes.has(c.code)) ctx.addIssue({ code: "custom", path: ["markets", "currencies", i, "code"], message: "العملة مكررة" });
       codes.add(c.code);
@@ -314,4 +320,15 @@ export async function saveSettingsAction(_prev: ActionResult, formData: FormData
   }
   revalidatePath("/", "layout");
   return actionOk("حُفظت الإعدادات وظهرت في المتجر", { settings: next });
+}
+
+/** Rates subset the dashboard needs (catalog currencies + the base). */
+export async function refreshRatesAction(): Promise<{ rates: Record<string, number>; updatedAt: string; source: string } | null> {
+  await requireAdmin("manager");
+  const fx = await refreshFxNow();
+  if (!fx) return null;
+  revalidatePath("/", "layout");
+  const settings = await getSettings();
+  const codes = new Set([...CURRENCY_CATALOG.map((c) => c.code), settings.currency.code.toUpperCase()]);
+  return { rates: Object.fromEntries(Object.entries(fx.rates).filter(([k]) => codes.has(k))), updatedAt: fx.updatedAt, source: fx.source };
 }

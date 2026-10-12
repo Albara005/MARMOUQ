@@ -8,6 +8,7 @@ import { Footer } from "@/components/store/footer";
 import { CartDrawer } from "@/components/store/cart-drawer";
 import { WhatsAppFab } from "@/components/store/whatsapp-fab";
 import { RevealRoot } from "@/components/store/reveal";
+import { GeoCurrency } from "@/components/store/geo-currency";
 import { themeCss } from "@/lib/theme";
 
 /**
@@ -31,6 +32,7 @@ export async function StoreShell({ children }: { children: React.ReactNode }) {
       <CartProvider>
         <WishlistProvider>
           {themeCss(settings.theme) && <style dangerouslySetInnerHTML={{ __html: themeCss(settings.theme) }} />}
+          <GeoCurrency />
           <div className="flex min-h-dvh flex-col">
             <a
               href="#main"

@@ -8,7 +8,9 @@ import { DEFAULT_NAV, resolveCopy, type NavLink } from "@/lib/copy";
 import type { CustomPage, HomeSectionKey, Layouts } from "@/lib/blocks";
 import { DEFAULT_CARRIERS, type Carrier } from "@/lib/carriers";
 import { DEFAULT_SIZE_GUIDES, type SizeGuideDef } from "@/lib/size-guides";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { getFxTable, type FxTable } from "@/lib/fx";
+import { COUNTRY_COOKIE, autoBasePerUnit, currencyForCountry, usdInBase } from "@/lib/currency-catalog";
 
 export type PaymentAccount = { bank: string; holder: string; number: string };
 
@@ -27,6 +29,8 @@ export type MarketCurrency = {
   /** Round converted prices to this step (1, 5, 10 …); 0 = none */
   roundTo: number;
   enabled: boolean;
+  /** "auto" (default) = live market rate; "manual" = basePerUnit typed by the merchant */
+  rateMode?: "auto" | "manual";
 };
 
 export type BarTone = "espresso" | "copper" | "burgundy" | "navy" | "ivory";
@@ -77,8 +81,12 @@ export type StoreSettings = {
   /** International selling: extra display currencies + the customer-facing switcher */
   markets: {
     switcher: boolean;
-    /** Currency shown to first-time visitors ("" = base currency) */
+    /** Show each visitor their own country's currency when it is offered */
+    autoDetect: boolean;
+    /** Currency for visitors whose currency is not offered / not detected ("" = base currency) */
     defaultCode: string;
+    /** Market price of 1 USD in the base currency (0 = live feed). Needed for currencies with parallel rates (YER). */
+    usdRate: number;
     currencies: MarketCurrency[];
   };
   /** Announcement bar (top) and the moving brand band on the home page */
@@ -169,7 +177,7 @@ export const DEFAULT_SETTINGS: StoreSettings = {
     title: "مرموق | MARMOUQ — أزياء رجالية راقية",
     description: "طريقك لتكون شخصية مرموقة. ملابس رجالية راقية بتفاصيل مختارة بعناية: تريكو قطني إيطالي، قمصان، بناطيل وأحذية.",
   },
-  markets: { switcher: true, defaultCode: "", currencies: [] },
+  markets: { switcher: true, autoDetect: true, defaultCode: "", usdRate: 0, currencies: [] },
   copy: {},
   nav: DEFAULT_NAV,
   faq: [],
@@ -228,13 +236,23 @@ function merge<T>(base: T, patch: unknown): T {
 /** Store settings merged over defaults. Deduplicated per request. Never throws (falls back to defaults). */
 export const getSettings = cache(async (): Promise<StoreSettings> => {
   try {
-    const row = await db.query.settings.findFirst({ where: eq(settings.key, KEY) });
-    return merge(DEFAULT_SETTINGS, row?.value);
+    const [row, fx] = await Promise.all([db.query.settings.findFirst({ where: eq(settings.key, KEY) }), getFxTable().catch(() => null)]);
+    return applyFx(merge(DEFAULT_SETTINGS, row?.value), fx);
   } catch (err) {
     console.error("[settings] falling back to defaults:", err);
     return DEFAULT_SETTINGS;
   }
 });
+
+/** Fills basePerUnit of "auto" currencies from live rates (0 = no safe rate → hidden from customers). */
+function applyFx(s: StoreSettings, fx: FxTable | null): StoreSettings {
+  if (!s.markets.currencies.length) return s;
+  const usd = usdInBase(s.currency.code, s.markets.usdRate, fx?.rates);
+  const currencies = s.markets.currencies.map((c): MarketCurrency =>
+    c.rateMode === "manual" ? c : { ...c, rateMode: "auto", basePerUnit: autoBasePerUnit(c.code, usd, fx?.rates) },
+  );
+  return { ...s, markets: { ...s.markets, currencies } };
+}
 
 export async function saveSettings(next: StoreSettings): Promise<void> {
   await db
@@ -252,6 +270,8 @@ export type PublicStoreConfig = Pick<StoreSettings, "storeName" | "storeNameEn" 
   baseCurrency: Currency;
   /** Currencies offered in the switcher (base first); empty when the switcher is off */
   currencyOptions: { code: string; symbol: string; label: string }[];
+  /** Currencies picked automatically from the visitor's country (empty = auto-detect off) */
+  autoCurrencies: string[];
 };
 
 export function toPublicConfig(s: StoreSettings, display?: Currency): PublicStoreConfig {
@@ -273,12 +293,22 @@ export function toPublicConfig(s: StoreSettings, display?: Currency): PublicStor
       s.markets.switcher && enabled.length
         ? [{ code: s.currency.code, symbol: s.currency.symbol, label: "العملة الأساسية" }, ...enabled.map((c) => ({ code: c.code, symbol: c.symbol, label: c.label || c.code }))]
         : [],
+    autoCurrencies: s.markets.autoDetect && enabled.length ? [s.currency.code, ...enabled.map((c) => c.code)] : [],
   };
 }
 
-/** Resolves a currency code to a display currency (falls back to the base). Pure — safe anywhere. */
-export function resolveDisplayCurrency(s: StoreSettings, code: string | null | undefined): Currency {
-  const want = (code || s.markets.defaultCode || "").toUpperCase();
+/**
+ * The currency to show: the visitor's own choice, else their country's currency when offered
+ * (auto-detect), else the fallback currency, else the base. Pure — safe anywhere.
+ */
+export function resolveDisplayCurrency(s: StoreSettings, code: string | null | undefined, country?: string | null): Currency {
+  const base = s.currency.code.toUpperCase();
+  const offered = (c: string) => c === base || s.markets.currencies.some((m) => m.enabled && m.basePerUnit > 0 && m.code === c);
+  let want = (code || "").toUpperCase();
+  if (!want || !offered(want)) {
+    const geo = s.markets.autoDetect ? currencyForCountry(country) : null;
+    want = geo && offered(geo) ? geo : (s.markets.defaultCode || "").toUpperCase();
+  }
   const m = s.markets.currencies.find((c) => c.enabled && c.basePerUnit > 0 && c.code === want);
   if (!m) return s.currency;
   return { code: m.code, symbol: m.symbol, position: m.position, basePerUnit: m.basePerUnit, markup: m.markup, decimals: m.decimals, roundTo: m.roundTo };
@@ -286,16 +316,30 @@ export function resolveDisplayCurrency(s: StoreSettings, code: string | null | u
 
 export const CURRENCY_COOKIE = "mrq_cur";
 
-/** The visitor's display currency, from the switcher cookie (server components only). */
+/** Country headers set by CDNs / hosts in front of the app (when present). */
+const GEO_HEADERS = ["cf-ipcountry", "x-vercel-ip-country", "cloudfront-viewer-country", "x-country-code", "fastly-geo-country"];
+
+/** The visitor's display currency: switcher choice, else their country's currency (server components only). */
 export async function getDisplayCurrency(s?: StoreSettings): Promise<Currency> {
   const settings = s ?? (await getSettings());
   let code: string | undefined;
+  let country: string | undefined;
   try {
-    code = (await cookies()).get(CURRENCY_COOKIE)?.value;
+    const jar = await cookies();
+    code = jar.get(CURRENCY_COOKIE)?.value;
+    country = jar.get(COUNTRY_COOKIE)?.value;
   } catch {
     code = undefined;
   }
-  return resolveDisplayCurrency(settings, code);
+  if (!code && !country && settings.markets.autoDetect) {
+    try {
+      const h = await headers();
+      country = GEO_HEADERS.map((k) => h.get(k)).find((v) => v && /^[A-Za-z]{2}$/.test(v) && v.toUpperCase() !== "XX") ?? undefined;
+    } catch {
+      country = undefined;
+    }
+  }
+  return resolveDisplayCurrency(settings, code, country);
 }
 
 /** Storefront copy for server components. */

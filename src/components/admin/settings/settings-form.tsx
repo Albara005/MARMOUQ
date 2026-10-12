@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, Blocks, Coins, Ruler, CreditCard, ExternalLink, FileText, Globe, House, LayoutTemplate, Megaphone, Palette, Plus, Search, Store, Truck, CircleAlert } from "lucide-react";
-import type { BarTone, HomeSectionKey, MarketCurrency, StoreSettings } from "@/lib/settings";
+import type { BarTone, HomeSectionKey, StoreSettings } from "@/lib/settings";
 import type { MediaLike } from "@/components/ui/media-image";
-import { formatMoney, type Currency } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 import { cn, whatsappLink } from "@/lib/utils";
 import { Input, Label, Select, Switch, Textarea } from "@/components/ui/field";
 import { ActionFieldError, ActionForm, ActionFormError, SubmitButton, useActionFormState } from "@/components/admin/ui-client";
@@ -13,6 +13,7 @@ import { saveSettingsAction } from "@/app/admin/(panel)/settings/actions";
 import { ListEditor } from "./list-editors";
 import { SectionsEditor, setBuiltinEnabled } from "./sections-editor";
 import { SizeGuidesEditor } from "./size-guides-editor";
+import { MarketsEditor, type FxInfo } from "./markets-editor";
 import type { SectionsCatalog } from "./block-meta";
 import { resolveHomeLayout } from "@/lib/blocks";
 import { COPY_GROUPS, DEFAULT_NAV, type NavLink } from "@/lib/copy";
@@ -80,6 +81,7 @@ export function SettingsForm({
   lookOptions = [],
   catalog = EMPTY_CATALOG,
   guideUsage = {},
+  fx = null,
   initialTab,
 }: {
   initial: StoreSettings;
@@ -91,6 +93,8 @@ export function SettingsForm({
   catalog?: SectionsCatalog;
   /** products using each size guide id */
   guideUsage?: Record<string, number>;
+  /** live exchange rates for the currencies tab */
+  fx?: FxInfo;
   initialTab: string;
 }) {
   const [s, setS] = useState<StoreSettings>(initial);
@@ -1002,53 +1006,8 @@ export function SettingsForm({
             </Section>
           </div>
 
-          <div role="tabpanel" id="panel-markets" aria-labelledby="tab-markets" hidden={tab !== "markets"} className="space-y-5">
-            <Section
-              title="البيع الدولي بعملات متعددة"
-              description={`أسعار المنتجات تُدخل وتُحفظ بالعملة الأساسية (${s.currency.code}). أضف عملات للعملاء خارج اليمن، وحدّد سعر الصرف ونسبة إضافية لكل سوق — والمتجر يحوّل كل الأسعار تلقائياً.`}
-              aside={<Switch checked={s.markets.switcher} onChange={(e) => setS((p) => ({ ...p, markets: { ...p.markets, switcher: e.target.checked } }))} label="إظهار مبدّل العملة" />}
-            >
-              <div className="grid gap-4 sm:grid-cols-2">
-                <F label="العملة الافتراضية للزوار" name="markets.defaultCode" hint="ما يراه الزائر لأول مرة قبل أن يختار.">
-                  <Select id="s-markets.defaultCode" className={inputSm} value={s.markets.defaultCode} onChange={(e) => setS((p) => ({ ...p, markets: { ...p.markets, defaultCode: e.target.value } }))}>
-                    <option value="">{`العملة الأساسية (${s.currency.code})`}</option>
-                    {s.markets.currencies
-                      .filter((c) => c.enabled && c.code)
-                      .map((c) => (
-                        <option key={c.code} value={c.code}>{`${c.label || c.code} (${c.code})`}</option>
-                      ))}
-                  </Select>
-                </F>
-                <div>
-                  <p className="mb-1.5 text-sm font-medium text-umber">إضافة سريعة</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {CURRENCY_PRESETS.filter((p) => p.code !== s.currency.code && !s.markets.currencies.some((c) => c.code === p.code)).map((p) => (
-                      <button
-                        key={p.code}
-                        type="button"
-                        onClick={() => setS((prev) => ({ ...prev, markets: { ...prev.markets, currencies: [...prev.markets.currencies, { ...p, basePerUnit: 0, markup: 0, enabled: true }] } }))}
-                        className="inline-flex h-8 items-center gap-1 rounded-full bg-bone px-3 text-xs text-umber hover:bg-sand"
-                      >
-                        <Plus className="size-3" aria-hidden /> {p.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </Section>
-
-            <Section title="العملات" description="لكل عملة: كم تساوي بالعملة الأساسية، ونسبة إضافية اختيارية لذلك السوق (رسوم أو شحن دولي)، وطريقة التقريب.">
-              <ListEditor
-                items={s.markets.currencies}
-                onChange={(currencies) => setS((p) => ({ ...p, markets: { ...p.markets, currencies } }))}
-                create={(): MarketCurrency => ({ code: "", symbol: "", label: "", position: "after", basePerUnit: 0, markup: 0, decimals: 0, roundTo: 1, enabled: true })}
-                max={12}
-                addLabel="إضافة عملة"
-                emptyLabel="لا عملات إضافية — المتجر يعرض الأسعار بالعملة الأساسية فقط."
-                itemLabel={(i) => `العملة ${i + 1}`}
-                render={(c, update, i) => <CurrencyRow c={c} update={update} i={i} base={s.currency} />}
-              />
-            </Section>
+          <div role="tabpanel" id="panel-markets" aria-labelledby="tab-markets" hidden={tab !== "markets"}>
+            <MarketsEditor markets={s.markets} base={s.currency} fx={fx} onChange={(markets) => setS((p) => ({ ...p, markets }))} />
           </div>
         </div>
       </div>
@@ -1129,91 +1088,3 @@ function TonePicker({ value, onChange }: { value: BarTone; onChange: (t: BarTone
 }
 
 
-const CURRENCY_PRESETS: Omit<MarketCurrency, "basePerUnit" | "markup" | "enabled">[] = [
-  { code: "SAR", symbol: "ر.س", label: "ريال سعودي", position: "after", decimals: 0, roundTo: 1 },
-  { code: "AED", symbol: "د.إ", label: "درهم إماراتي", position: "after", decimals: 0, roundTo: 1 },
-  { code: "OMR", symbol: "ر.ع", label: "ريال عماني", position: "after", decimals: 2, roundTo: 0 },
-  { code: "QAR", symbol: "ر.ق", label: "ريال قطري", position: "after", decimals: 0, roundTo: 1 },
-  { code: "KWD", symbol: "د.ك", label: "دينار كويتي", position: "after", decimals: 2, roundTo: 0 },
-  { code: "BHD", symbol: "د.ب", label: "دينار بحريني", position: "after", decimals: 2, roundTo: 0 },
-  { code: "USD", symbol: "$", label: "دولار أمريكي", position: "before", decimals: 2, roundTo: 0 },
-  { code: "EUR", symbol: "€", label: "يورو", position: "before", decimals: 2, roundTo: 0 },
-  { code: "GBP", symbol: "£", label: "جنيه إسترليني", position: "before", decimals: 2, roundTo: 0 },
-  { code: "EGP", symbol: "ج.م", label: "جنيه مصري", position: "after", decimals: 0, roundTo: 5 },
-  { code: "YER", symbol: "ر.ي", label: "ريال يمني", position: "after", decimals: 0, roundTo: 1 },
-];
-
-function CurrencyRow({ c, update, i, base }: { c: MarketCurrency; update: (next: MarketCurrency) => void; i: number; base: Currency }) {
-  const sample = 25000;
-  const preview: Currency = { code: c.code, symbol: c.symbol || c.code, position: c.position, basePerUnit: c.basePerUnit, markup: c.markup, decimals: c.decimals, roundTo: c.roundTo };
-  const p = `markets.currencies.${i}`;
-  return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <div>
-          <label htmlFor={`s-${p}.code`} className="mb-1 block text-xs text-taupe">الرمز</label>
-          <Input id={`s-${p}.code`} dir="ltr" className="h-10 text-sm uppercase" maxLength={3} value={c.code} onChange={(e) => update({ ...c, code: e.target.value.toUpperCase() })} placeholder="SAR" />
-          <ActionFieldError name={`${p}.code`} />
-        </div>
-        <div>
-          <label htmlFor={`s-${p}.symbol`} className="mb-1 block text-xs text-taupe">العلامة</label>
-          <Input id={`s-${p}.symbol`} className="h-10 text-sm" maxLength={8} value={c.symbol} onChange={(e) => update({ ...c, symbol: e.target.value })} placeholder="ر.س" />
-          <ActionFieldError name={`${p}.symbol`} />
-        </div>
-        <div className="col-span-2">
-          <label htmlFor={`s-${p}.label`} className="mb-1 block text-xs text-taupe">الاسم الظاهر للعميل</label>
-          <Input id={`s-${p}.label`} className="h-10 text-sm" maxLength={30} value={c.label} onChange={(e) => update({ ...c, label: e.target.value })} placeholder="ريال سعودي" />
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <div className="col-span-2">
-          <label htmlFor={`s-${p}.basePerUnit`} className="mb-1 block text-xs text-taupe">{`سعر الصرف: 1 ${c.code || "…"} = كم ${base.symbol}`}</label>
-          <Input id={`s-${p}.basePerUnit`} type="number" min={0} step="any" className="h-10 text-sm" value={c.basePerUnit || ""} onChange={(e) => update({ ...c, basePerUnit: Number(e.target.value) || 0 })} placeholder="140" />
-          <ActionFieldError name={`${p}.basePerUnit`} />
-        </div>
-        <div>
-          <label htmlFor={`s-${p}.markup`} className="mb-1 block text-xs text-taupe">نسبة إضافية %</label>
-          <Input id={`s-${p}.markup`} type="number" step="any" className="h-10 text-sm" value={c.markup} onChange={(e) => update({ ...c, markup: Number(e.target.value) || 0 })} />
-          <ActionFieldError name={`${p}.markup`} />
-        </div>
-        <div>
-          <label htmlFor={`s-${p}.round`} className="mb-1 block text-xs text-taupe">التقريب</label>
-          <Select
-            id={`s-${p}.round`}
-            className="h-10 text-sm"
-            value={`${c.decimals}:${c.roundTo}`}
-            onChange={(e) => {
-              const [d, r] = e.target.value.split(":").map(Number);
-              update({ ...c, decimals: d === 2 ? 2 : 0, roundTo: r });
-            }}
-          >
-            <option value="2:0">بالهللات (12.50)</option>
-            <option value="0:1">لأقرب 1</option>
-            <option value="0:5">لأقرب 5</option>
-            <option value="0:10">لأقرب 10</option>
-            <option value="0:50">لأقرب 50</option>
-            <option value="0:100">لأقرب 100</option>
-          </Select>
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-4">
-          <Switch checked={c.enabled} onChange={(e) => update({ ...c, enabled: e.target.checked })} label="مفعّلة" />
-          <Select className="h-9 w-36 text-xs" value={c.position} onChange={(e) => update({ ...c, position: e.target.value as "after" | "before" })} aria-label="موضع العلامة">
-            <option value="after">العلامة بعد الرقم</option>
-            <option value="before">العلامة قبل الرقم</option>
-          </Select>
-        </div>
-        <p className="text-xs text-taupe">
-          {c.basePerUnit > 0 ? (
-            <>
-              منتج بـ {formatMoney(sample, base)} يظهر: <span className="font-semibold text-espresso">{formatMoney(sample, preview)}</span>
-            </>
-          ) : (
-            "أدخل سعر الصرف لرؤية المعاينة"
-          )}
-        </p>
-      </div>
-    </div>
-  );
-}

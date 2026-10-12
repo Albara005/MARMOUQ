@@ -3,6 +3,8 @@ import Link from "next/link";
 import { ArrowUpLeft } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
+import { getFxTable } from "@/lib/fx";
+import { CURRENCY_CATALOG } from "@/lib/currency-catalog";
 import { getMediaRefs, listCategories, listLooks, listProducts } from "@/lib/catalog";
 import { db } from "@/db";
 import { products as productsTable } from "@/db/schema";
@@ -17,13 +19,16 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const settings = await getSettings();
   const ids = [settings.hero.mediaId, settings.hero.mobileMediaId].filter((x): x is string => !!x);
-  const [refs, products, looks, categories, guideRows] = await Promise.all([
+  const [refs, products, looks, categories, guideRows, fxTable] = await Promise.all([
     ids.length ? getMediaRefs(ids) : Promise.resolve([]),
     listProducts({ limit: 100 }),
     listLooks(50),
     listCategories(),
     db.select({ guide: productsTable.sizeGuide, parts: productsTable.setParts }).from(productsTable),
+    getFxTable(),
   ]);
+  const fxCodes = new Set([...CURRENCY_CATALOG.map((c) => c.code), settings.currency.code.toUpperCase()]);
+  const fx = fxTable ? { rates: Object.fromEntries(Object.entries(fxTable.rates).filter(([k]) => fxCodes.has(k))), updatedAt: fxTable.updatedAt, source: fxTable.source } : null;
   const guideUsage: Record<string, number> = {};
   for (const r of guideRows) {
     const ids = new Set([r.guide, ...(r.parts ?? []).map((p) => p.guide)]);
@@ -66,6 +71,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         lookOptions={lookOptions}
         catalog={catalog}
         guideUsage={guideUsage}
+        fx={fx}
         initialTab={typeof sp.tab === "string" ? sp.tab : "identity"} />
     </div>
   );
