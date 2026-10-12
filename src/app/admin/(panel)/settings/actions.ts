@@ -167,7 +167,7 @@ const settingsSchema = z
     carriers: z
       .array(
         z.object({
-          id: z.string().regex(/^[A-Za-z0-9_-]{4,40}$/),
+          id: z.string().regex(/^[A-Za-z0-9_-]{2,40}$/),
           name: required(2, 40, "اسم الشركة مطلوب"),
           trackingUrl: z
             .string()
