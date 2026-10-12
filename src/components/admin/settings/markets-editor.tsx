@@ -14,6 +14,7 @@ export type FxInfo = { rates: Record<string, number>; updatedAt: string; source:
 type Markets = StoreSettings["markets"];
 
 const SAMPLE = 25000;
+const MAX_CURRENCIES = 40;
 const fmtRate = (n: number) => (n >= 100 ? n.toLocaleString("en-US", { maximumFractionDigits: 0 }) : n.toLocaleString("en-US", { maximumFractionDigits: 3 }));
 
 function fromCatalog(code: string): MarketCurrency {
@@ -38,7 +39,7 @@ export function MarketsEditor({ markets, base, fx: initialFx, onChange }: { mark
     if (selected.has(code)) {
       if (!window.confirm(`إزالة ${catalogCurrency(code)?.label ?? code} من المتجر؟`)) return;
       set({ currencies: markets.currencies.filter((c) => c.code !== code), defaultCode: markets.defaultCode === code ? "" : markets.defaultCode });
-    } else if (markets.currencies.length < 12) {
+    } else if (markets.currencies.length < MAX_CURRENCIES) {
       set({ currencies: [...markets.currencies, fromCatalog(code)] });
     }
   };

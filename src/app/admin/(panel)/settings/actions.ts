@@ -142,7 +142,7 @@ const settingsSchema = z
             enabled: z.boolean(),
           }),
         )
-        .max(12, "12 عملة كحد أقصى"),
+        .max(40, "40 عملة كحد أقصى"),
     }),
     bars: z.object({
       announcement: z.object({ enabled: z.boolean(), tone: TONE, href: z.union([z.literal(""), href]), interval: z.coerce.number().int().min(2, "ثانيتان على الأقل").max(30, "30 ثانية كحد أقصى") }),
