@@ -2,9 +2,11 @@
  * Shared shapes between the product editor (client) and its server actions / loaders.
  * No directive on purpose: importable from server and client code.
  */
+import type { SetPart } from "@/lib/size-guides";
 
 export type ProductStatus = "active" | "draft" | "archived";
-export type SizeGuide = "tops" | "bottoms" | "shoes" | "none";
+/** id of a size guide from settings, or "none" */
+export type SizeGuide = string;
 
 export type EditorImage = { id: string; blur?: string; width?: number; height?: number; alt?: string; color: string };
 export type EditorColor = { name: string; hex: string };
@@ -45,6 +47,8 @@ export type ProductEditorData = {
   images: EditorImage[];
   colors: EditorColor[];
   sizes: string[];
+  /** Set sold with a size per piece (shirt + trousers…); null = one size list */
+  setParts: SetPart[] | null;
   variants: EditorVariant[];
   /** Variants that appear on past orders (cannot be hard-deleted) */
   orderedVariantIds: number[];
@@ -74,6 +78,7 @@ export type ProductPayload = {
   badge: string;
   sortOrder: number;
   images: { id: string; color: string }[];
+  setParts: SetPart[] | null;
   variants: EditorVariant[];
 };
 
@@ -83,12 +88,6 @@ export const PRODUCT_STATUS_META: Record<ProductStatus, { label: string; tone: "
   archived: { label: "مؤرشف", tone: "neutral" },
 };
 
-export const SIZE_GUIDE_LABELS: Record<SizeGuide, string> = {
-  tops: "قطع علوية (تريكو، قمصان)",
-  bottoms: "بناطيل",
-  shoes: "أحذية",
-  none: "بدون دليل مقاسات",
-};
 
 /** Brand palette (matches the seeded colours) for one-tap colour creation. */
 export const BRAND_COLORS: EditorColor[] = [

@@ -14,7 +14,7 @@ export default async function NewProductPage() {
   return (
     <>
       <Breadcrumbs items={[{ label: "المنتجات", href: "/admin/products" }, { label: "منتج جديد" }]} />
-      <ProductEditor initial={emptyProduct()} categories={categories} currencySymbol={settings.currency.symbol} />
+      <ProductEditor initial={emptyProduct()} categories={categories} currencySymbol={settings.currency.symbol} sizeGuides={settings.sizeGuides.map((g) => ({ id: g.id, name: g.name }))} />
     </>
   );
 }

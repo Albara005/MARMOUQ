@@ -18,11 +18,17 @@ export type Carrier = {
 
 export const TRACKING_PLACEHOLDER = "{tracking}";
 
+/** DHL's universal tracking page (Express, eCommerce and parcel numbers). */
+export const DHL_TRACKING_URL = "https://www.dhl.com/global-en/home/tracking.html?tracking-id={tracking}&submit=1";
+
+/** The store ships with DHL — ready out of the box (editable in Settings → الشحن). */
+export const DEFAULT_CARRIERS: Carrier[] = [{ id: "dhl", name: "DHL", trackingUrl: DHL_TRACKING_URL, phone: "", enabled: true }];
+
 /** Well-known couriers with public tracking pages (international + Gulf). */
 export const CARRIER_PRESETS: { name: string; trackingUrl: string }[] = [
+  { name: "DHL", trackingUrl: DHL_TRACKING_URL },
   { name: "أرامكس Aramex", trackingUrl: "https://www.aramex.com/us/en/track/results?ShipmentNumber={tracking}" },
   { name: "سمسا SMSA", trackingUrl: "https://www.smsaexpress.com/trackingdetails?tracknumbers={tracking}" },
-  { name: "DHL Express", trackingUrl: "https://www.dhl.com/global-en/home/tracking/tracking-express.html?submit=1&tracking-id={tracking}" },
   { name: "FedEx", trackingUrl: "https://www.fedex.com/fedextrack/?trknbr={tracking}" },
   { name: "UPS", trackingUrl: "https://www.ups.com/track?loc=en_US&tracknum={tracking}" },
   { name: "شركة محلية (بدون موقع تتبّع)", trackingUrl: "" },

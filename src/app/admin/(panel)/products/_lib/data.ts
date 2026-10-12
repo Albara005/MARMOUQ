@@ -31,6 +31,7 @@ export function emptyProduct(): ProductEditorData {
     images: [],
     colors: [],
     sizes: [],
+    setParts: null,
     variants: [],
     orderedVariantIds: [],
     unitsSold: 0,
@@ -89,6 +90,7 @@ export async function loadProductForEditor(id: number): Promise<ProductEditorDat
     images: imgs.map((i) => ({ id: i.id, blur: i.blur, width: i.width, height: i.height, alt: i.alt, color: i.color })),
     colors,
     sizes: cleanSizes,
+    setParts: Array.isArray(p.setParts) && p.setParts.length >= 2 ? p.setParts : null,
     variants: vars.map((v) => ({
       id: v.id,
       color: v.color,

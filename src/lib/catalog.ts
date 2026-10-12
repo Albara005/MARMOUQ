@@ -3,6 +3,7 @@ import { cache } from "react";
 import { and, asc, desc, eq, gte, ilike, inArray, lte, ne, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { categories, lookItems, looks, media, productImages, products, productVariants, shippingZones } from "@/db/schema";
+import { SET_SEPARATOR, splitSetSize, type SetPart } from "@/lib/size-guides";
 
 /* ───────────── Types (safe to pass to client components) ───────────── */
 
@@ -26,9 +27,12 @@ export type ProductCardData = {
   /** Ordered gallery (first = cover, second = hover image) */
   images: ProductImage[];
   colors: ColorOption[];
+  /** Plain sizes; for sets, every piece size (e.g. ["M","L","30","32"]) */
   sizes: string[];
   totalStock: number;
   inStock: boolean;
+  /** Set sold with a size per piece (shirt + trousers…); null = single size choice */
+  setParts: SetPart[] | null;
 };
 
 export type VariantData = {
@@ -46,7 +50,8 @@ export type ProductDetail = ProductCardData & {
   material: string;
   origin: string;
   care: string;
-  sizeGuide: "tops" | "bottoms" | "shoes" | "none";
+  /** size guide id from settings ("none" = no guide) */
+  sizeGuide: string;
   variants: VariantData[];
 };
 
@@ -116,6 +121,7 @@ async function hydrateCards(
     categoryId: number | null;
     categorySlug: string | null;
     categoryName: string | null;
+    setParts: SetPart[] | null;
   }>,
 ): Promise<ProductCardData[]> {
   if (rows.length === 0) return [];
@@ -142,9 +148,10 @@ async function hydrateCards(
     const colors: ColorOption[] = [];
     for (const v of pv) if (v.color && !colors.some((c) => c.name === v.color)) colors.push({ name: v.color, hex: v.colorHex || "#999" });
     const sizes: string[] = [];
-    for (const v of pv) if (v.size && !sizes.includes(v.size)) sizes.push(v.size);
+    const set = Array.isArray(r.setParts) && r.setParts.length >= 2 ? r.setParts : null;
+    for (const v of pv) for (const sz of set ? splitSetSize(v.size, set.length) : [v.size]) if (sz && !sizes.includes(sz)) sizes.push(sz);
     const totalStock = pv.reduce((s, v) => s + Math.max(0, v.stock), 0);
-    return { ...r, images, colors, sizes, totalStock, inStock: totalStock > 0 };
+    return { ...r, setParts: set, images, colors, sizes, totalStock, inStock: totalStock > 0 };
   });
 }
 
@@ -161,6 +168,7 @@ const cardSelect = {
   categoryId: products.categoryId,
   categorySlug: categories.slug,
   categoryName: categories.name,
+  setParts: products.setParts,
 };
 
 /* ───────────── Public API ───────────── */
@@ -185,7 +193,7 @@ export async function listProducts(query: ProductQuery = {}): Promise<{ items: P
   }
   if (query.size) {
     where.push(
-      sql`exists (select 1 from ${productVariants} v where v.product_id = ${products.id} and v.is_active and v.size = ${query.size} and v.stock > 0)`,
+      sql`exists (select 1 from ${productVariants} v where v.product_id = ${products.id} and v.is_active and v.stock > 0 and ${query.size} = any(string_to_array(v.size, ${SET_SEPARATOR})))`,
     );
   }
 
@@ -272,7 +280,7 @@ export async function getFilterFacets(category?: string): Promise<{ colors: Colo
   const sizes: string[] = [];
   for (const r of facetRows) {
     if (r.color && !colors.some((c) => c.name === r.color)) colors.push({ name: r.color, hex: r.color_hex || "#999" });
-    if (r.size && !sizes.includes(r.size)) sizes.push(r.size);
+    for (const sz of r.size.split(SET_SEPARATOR)) if (sz && !sizes.includes(sz)) sizes.push(sz);
   }
   const SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
   sizes.sort((a, b) => {

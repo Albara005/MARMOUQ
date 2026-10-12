@@ -10,6 +10,7 @@ import { slugify } from "@/lib/utils";
 import { actionError, actionOk, zodFieldErrors, type ActionResult } from "@/components/admin/action-result";
 import { isMediaId } from "@/components/admin/media-ids";
 import { normalizeDetails, variantKey } from "@/components/admin/product-editor/types";
+import { SET_LIMITS, setCombos } from "@/lib/size-guides";
 
 /* ───────────── Validation ───────────── */
 
@@ -28,7 +29,7 @@ const variantSchema = z.object({
   id: z.number().int().positive().nullable(),
   color: text(40),
   colorHex: z.string().trim().regex(HEX_RE, "رمز لون غير صالح"),
-  size: text(20),
+  size: text(40),
   sku: text(60),
   stock: z.number({ message: "أدخل الكمية بالأرقام" }).int("الكمية رقم صحيح").min(0, "الكمية لا تقل عن صفر").max(100_000, "الكمية كبيرة جداً"),
   priceOverride: money("السعر").min(1, "السعر الخاص يجب أن يكون أكبر من صفر").nullable(),
@@ -54,7 +55,21 @@ const payloadSchema = z
     material: text(200),
     origin: text(120),
     care: text(600),
-    sizeGuide: z.enum(["tops", "bottoms", "shoes", "none"]),
+    sizeGuide: z.string().trim().regex(/^[A-Za-z0-9_-]{2,40}$/, "دليل مقاسات غير صالح"),
+    setParts: z
+      .array(
+        z.object({
+          label: z.string().trim().min(1, "اكتب اسم القطعة").max(20, "اسم القطعة طويل"),
+          guide: z.string().trim().regex(/^[A-Za-z0-9_-]{2,40}$/),
+          sizes: z
+            .array(z.string().trim().min(1).max(10, "المقاس طويل").regex(/^[^/]+$/, "المقاس لا يحتوي على /"))
+            .min(1, "أضف مقاساً واحداً على الأقل لكل قطعة")
+            .max(SET_LIMITS.sizesPerPart, `${SET_LIMITS.sizesPerPart} مقاساً كحد أقصى لكل قطعة`),
+        }),
+      )
+      .min(2, "الطقم يحتاج قطعتين على الأقل")
+      .max(SET_LIMITS.parts, `${SET_LIMITS.parts} قطع كحد أقصى`)
+      .nullable(),
     price: money("السعر").min(1, "حدّد سعر البيع"),
     compareAtPrice: money("سعر المقارنة").nullable(),
     status: z.enum(["active", "draft", "archived"]),
@@ -68,6 +83,10 @@ const payloadSchema = z
   .superRefine((v, ctx) => {
     if (v.compareAtPrice != null && v.compareAtPrice > 0 && v.compareAtPrice <= v.price) {
       ctx.addIssue({ code: "custom", path: ["compareAtPrice"], message: "سعر ما قبل الخصم يجب أن يكون أعلى من سعر البيع" });
+    }
+    if (v.setParts) {
+      const combos = new Set(setCombos(v.setParts));
+      if (v.variants.some((x) => !combos.has(x.size))) ctx.addIssue({ code: "custom", path: ["setParts"], message: "مقاسات الطقم لا تطابق جدول الخيارات — أعد تحميل الصفحة" });
     }
     const seen = new Set<string>();
     for (const variant of v.variants) {
@@ -196,6 +215,7 @@ export async function saveProductAction(input: unknown): Promise<ActionResult> {
         isNew: v.isNew,
         badge: v.badge,
         sizeGuide: v.sizeGuide,
+        setParts: v.setParts,
         sortOrder: v.sortOrder,
         updatedAt: new Date(),
       };
@@ -331,6 +351,7 @@ export async function duplicateProductAction(id: number): Promise<ActionResult> 
           isNew: src.isNew,
           badge: src.badge,
           sizeGuide: src.sizeGuide,
+          setParts: src.setParts,
           sortOrder: src.sortOrder,
         })
         .returning({ id: products.id });

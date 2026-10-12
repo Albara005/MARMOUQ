@@ -150,7 +150,14 @@ export function ProductCard({
           </span>
         </button>
 
-        {!soldOut && <QuickAdd product={product} color={activeColorName} />}
+        {!soldOut &&
+          (product.setParts ? (
+            <span className="pointer-events-none absolute inset-x-3 bottom-3 hidden translate-y-2 rounded-xl bg-paper/92 px-3 py-2.5 text-center text-[0.78rem] font-medium text-espresso opacity-0 shadow-[0_10px_30px_-12px_rgba(28,19,15,0.35)] backdrop-blur-md transition-all duration-500 ease-[var(--ease-out-expo)] group-hover/card:translate-y-0 group-hover/card:opacity-100 [@media(hover:hover)_and_(pointer:fine)]:block">
+              طقم · اختر مقاس {product.setParts.map((p) => p.label).join(" و")}
+            </span>
+          ) : (
+            <QuickAdd product={product} color={activeColorName} />
+          ))}
       </div>
 
       <div className="mt-3.5 flex flex-1 flex-col gap-1 md:mt-4">

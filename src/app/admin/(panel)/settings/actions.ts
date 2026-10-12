@@ -10,6 +10,7 @@ import { getSettings, saveSettings, type StoreSettings } from "@/lib/settings";
 import { normalizePhone } from "@/lib/utils";
 import { COPY_GROUPS } from "@/lib/copy";
 import { blockMediaIds, type Block } from "@/lib/blocks";
+import { SIZE_GUIDE_LIMITS } from "@/lib/size-guides";
 import { customPagesSchema, layoutsSchema } from "@/lib/blocks-schema";
 import { actionError, actionOk, zodFieldErrors, type ActionResult } from "@/components/admin/action-result";
 
@@ -173,6 +174,34 @@ const settingsSchema = z
         }),
       )
       .max(12, "12 شركة كحد أقصى"),
+    sizeGuides: z
+      .array(
+        z
+          .object({
+            id: z.string().regex(/^[A-Za-z0-9_-]{2,40}$/),
+            name: required(2, 60, "اسم الدليل مطلوب"),
+            diagram: z.enum(["tops", "bottoms", "shoes", "none"]),
+            headers: z.array(required(1, 30, "عنوان العمود فارغ")).min(2, "عمودان على الأقل").max(SIZE_GUIDE_LIMITS.columns, `${SIZE_GUIDE_LIMITS.columns} أعمدة كحد أقصى`),
+            cm: z.array(z.boolean()),
+            rows: z.array(z.array(text(20))).max(SIZE_GUIDE_LIMITS.rows, `${SIZE_GUIDE_LIMITS.rows} صفاً كحد أقصى`),
+            note: text(300),
+            tips: z.array(z.object({ title: required(2, 60, "العنوان مطلوب"), body: text(400) })).max(SIZE_GUIDE_LIMITS.tips, `${SIZE_GUIDE_LIMITS.tips} نصائح كحد أقصى`),
+          })
+          .transform((g) => ({
+            ...g,
+            cm: g.headers.map((_, i) => i > 0 && !!g.cm[i]),
+            // pad/trim every row to the number of columns; drop rows without a size
+            rows: g.rows.map((r) => g.headers.map((_, i) => r[i] ?? "")).filter((r) => r[0].trim() !== ""),
+          })),
+      )
+      .max(SIZE_GUIDE_LIMITS.guides, `${SIZE_GUIDE_LIMITS.guides} أدلة كحد أقصى`)
+      .superRefine((list, ctx) => {
+        const ids = new Set<string>();
+        list.forEach((g, i) => {
+          if (ids.has(g.id)) ctx.addIssue({ code: "custom", path: [i, "name"], message: "الدليل مكرر" });
+          ids.add(g.id);
+        });
+      }),
     layouts: layoutsSchema,
     customPages: customPagesSchema,
     home: z.object({

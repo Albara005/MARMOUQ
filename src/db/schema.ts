@@ -81,7 +81,10 @@ export const products = pgTable(
     isFeatured: boolean("is_featured").notNull().default(false),
     isNew: boolean("is_new").notNull().default(false),
     badge: text("badge").notNull().default(""),
-    sizeGuide: text("size_guide").$type<"tops" | "bottoms" | "shoes" | "none">().notNull().default("tops"),
+    /** id of a size guide from settings ("none" = no guide) */
+    sizeGuide: text("size_guide").notNull().default("tops"),
+    /** Sold as a set (e.g. shirt + trousers) with a size per piece; null = one size choice */
+    setParts: jsonb("set_parts").$type<{ label: string; guide: string; sizes: string[] }[] | null>(),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

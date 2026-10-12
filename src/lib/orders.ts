@@ -23,6 +23,7 @@ import { normalizePhone, randomToken } from "@/lib/utils";
 import { formatMoney, isForeign } from "@/lib/money";
 import { notifyTelegram } from "@/lib/notify";
 import { STOCK_HOLDING, ORDER_STATUS_META } from "@/lib/order-status";
+import { formatSetSize } from "@/lib/size-guides";
 
 /* ───────────── Checkout input ───────────── */
 
@@ -124,6 +125,7 @@ export async function placeOrder(raw: unknown): Promise<PlaceOrderResult> {
           productName: products.name,
           productPrice: products.price,
           productStatus: products.status,
+          setParts: products.setParts,
         })
         .from(productVariants)
         .innerJoin(products, eq(products.id, productVariants.productId))
@@ -224,7 +226,8 @@ export async function placeOrder(raw: unknown): Promise<PlaceOrderResult> {
             variantId: v.id,
             name: v.productName,
             color: v.color,
-            size: v.size,
+            // sets keep the piece names on the order: "القميص L · البنطلون 32"
+            size: formatSetSize(v.setParts, v.size),
             imageId: img?.mediaId ?? null,
             unitPrice: v.priceOverride ?? v.productPrice,
             quantity: l.quantity,

@@ -19,7 +19,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
   return (
     <>
       <Breadcrumbs items={[{ label: "المنتجات", href: "/admin/products" }, { label: product.name }]} />
-      <ProductEditor key={product.updatedAt ?? product.id ?? "p"} initial={product} categories={categories} currencySymbol={settings.currency.symbol} />
+      <ProductEditor key={product.updatedAt ?? product.id ?? "p"} initial={product} categories={categories} currencySymbol={settings.currency.symbol} sizeGuides={settings.sizeGuides.map((g) => ({ id: g.id, name: g.name }))} />
     </>
   );
 }

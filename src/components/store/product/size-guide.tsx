@@ -4,67 +4,12 @@ import { useId, useRef, useState } from "react";
 import { Ruler, X } from "lucide-react";
 import { Portal, useModal, usePresence } from "@/components/store/overlay";
 import { cn } from "@/lib/utils";
+import type { SizeGuideDef } from "@/lib/size-guides";
 
 export type SizeGuideKind = "tops" | "bottoms" | "shoes";
 
-type Table = { headers: string[]; units: ("cm" | "none")[]; rows: { size: string; values: (number | string)[] }[]; note: string };
-
-const TABLES: Record<SizeGuideKind, Table> = {
-  tops: {
-    headers: ["المقاس", "محيط الصدر", "الطول", "عرض الأكتاف"],
-    units: ["none", "cm", "cm", "cm"],
-    rows: [
-      { size: "M", values: ["M", 104, 69, 45] },
-      { size: "L", values: ["L", 110, 71, 47] },
-      { size: "XL", values: ["XL", 116, 73, 49] },
-      { size: "XXL", values: ["XXL", 122, 75, 51] },
-    ],
-    note: "القياسات للقطعة نفسها وهي مفرودة، بفارق ±1 سم.",
-  },
-  bottoms: {
-    headers: ["المقاس", "محيط الخصر", "الطول الداخلي", "الطول الكلي"],
-    units: ["none", "cm", "cm", "cm"],
-    rows: [
-      { size: "30", values: ["30", 76, 76, 100] },
-      { size: "32", values: ["32", 81, 77, 101] },
-      { size: "34", values: ["34", 86, 78, 102] },
-      { size: "36", values: ["36", 91, 79, 103] },
-      { size: "38", values: ["38", 97, 80, 104] },
-    ],
-    note: "القصّة الكورية بخصر عالٍ وساق مستدقّة تنتهي فوق الكاحل بقليل.",
-  },
-  shoes: {
-    headers: ["EU", "UK", "طول القدم"],
-    units: ["none", "none", "cm"],
-    rows: [
-      { size: "40", values: ["40", "6.5", 25.5] },
-      { size: "41", values: ["41", "7", 26] },
-      { size: "42", values: ["42", "8", 26.7] },
-      { size: "43", values: ["43", "9", 27.3] },
-      { size: "44", values: ["44", "9.5", 28] },
-      { size: "45", values: ["45", "10.5", 28.6] },
-    ],
-    note: "طول القدم من الكعب حتى أطول إصبع، والقدم على الأرض.",
-  },
-};
-
-const TIPS: Record<SizeGuideKind, { title: string; body: string }[]> = {
-  tops: [
-    { title: "محيط الصدر", body: "لفّ المتر تحت الإبطين على أعرض نقطة في الصدر، وخلّه مرتاح لا مشدود ولا مرخي." },
-    { title: "تلبسه فوق قميص؟", body: "التريكو الإيطالي قصّته مضبوطة على الجسم. إذا كنت بين مقاسين وبتلبسه فوق قميص رسمي، اختر الأكبر." },
-    { title: "قارن بقطعة تحبها", body: "افرد أفضل سويتر عندك وقِس عرضه من إبط لإبط واضربه في 2 — هذا أدق رقم تقارن به." },
-  ],
-  bottoms: [
-    { title: "محيط الخصر", body: "قِس عند خط الخصر الطبيعي فوق السرّة بقليل، حيث يجلس البنطال الكوري العالي." },
-    { title: "الطول الداخلي", body: "من أعلى الفخذ الداخلي حتى الكاحل. القصّة تنتهي فوقه بقليل لتُظهر الحذاء بأناقة." },
-    { title: "بين مقاسين؟", body: "اختر مقاسك المعتاد — الكسرات الأمامية تعطي راحة كافية في الجلوس والحركة." },
-  ],
-  shoes: [
-    { title: "قِس آخر النهار", body: "القدم تتمدد خلال اليوم، فالقياس مساءً أصدق. قِس القدمين واعتمد الأطول." },
-    { title: "الشامواه يلين", body: "الجلد الطبيعي يتشكّل على قدمك بعد أيام. اللوفر يُلبس مريحاً من غير ارتخاء عند الكعب." },
-    { title: "بين مقاسين؟", body: "مع جوارب رقيقة اختر الأصغر، ومع جوارب سميكة أو قدم عريضة اختر الأكبر." },
-  ],
-};
+/** One tab of the guide: a set piece (or the product itself) with its table and current size. */
+export type SizeGuideEntry = { label: string; guide: SizeGuideDef; selected: string | null };
 
 function Diagram({ kind }: { kind: SizeGuideKind }) {
   const stroke = "var(--color-umber)";
@@ -129,27 +74,30 @@ function Diagram({ kind }: { kind: SizeGuideKind }) {
 
 /** Ruler link that opens the size-guide drawer (bottom sheet on phones, side drawer on desktop). */
 export function SizeGuide({
-  kind,
-  selectedSize,
+  entries,
   helpHref,
   helpLabel,
 }: {
-  kind: SizeGuideKind;
-  selectedSize: string | null;
+  entries: SizeGuideEntry[];
   helpHref: string | null;
   helpLabel: string;
 }) {
   const [open, setOpen] = useState(false);
   const [unit, setUnit] = useState<"cm" | "in">("cm");
+  const [tab, setTab] = useState(0);
+  const entry = entries[Math.min(tab, entries.length - 1)];
   const { mounted, visible } = usePresence(open, 500);
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   useModal({ open, onClose: () => setOpen(false), containerRef: panelRef });
-  const table = TABLES[kind];
+  if (!entry) return null;
+  const { guide, selected: selectedSize } = entry;
+  const hasCm = guide.cm.some(Boolean);
 
-  const fmt = (v: number | string, u: "cm" | "none") => {
-    if (typeof v === "string" || u === "none") return String(v);
-    return unit === "cm" ? String(v) : (v / 2.54).toFixed(1);
+  const fmt = (v: string, cm: boolean) => {
+    const n = Number(v.replace(",", "."));
+    if (!cm || unit === "cm" || !v.trim() || Number.isNaN(n)) return v || "—";
+    return (n / 2.54).toFixed(1);
   };
 
   return (
@@ -199,13 +147,32 @@ export function SizeGuide({
               </div>
 
               <div className="flex-1 overflow-y-auto overscroll-contain px-6 pb-8 md:px-8">
-                <div className="studio-frame flex items-center justify-center rounded-2xl py-6">
-                  <Diagram kind={kind} />
-                </div>
+                {entries.length > 1 && (
+                  <div role="tablist" aria-label="قطع الطقم" className="mb-5 grid grid-flow-col gap-1 rounded-full border border-line bg-paper p-1">
+                    {entries.map((e, i) => (
+                      <button
+                        key={e.label + i}
+                        type="button"
+                        role="tab"
+                        aria-selected={i === tab}
+                        onClick={() => setTab(i)}
+                        className={cn("h-10 rounded-full px-3 text-sm transition-colors", i === tab ? "bg-espresso text-paper" : "text-umber hover:text-espresso")}
+                      >
+                        {e.label}
+                        {e.selected && <span className="ms-1.5 text-xs opacity-70">({e.selected})</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {guide.diagram !== "none" && (
+                  <div className="studio-frame flex items-center justify-center rounded-2xl py-6">
+                    <Diagram kind={guide.diagram} />
+                  </div>
+                )}
 
                 <div className="mt-6 flex items-center justify-between">
-                  <p className="text-sm font-medium text-espresso">جدول القياسات</p>
-                  {table.units.includes("cm") && (
+                  <p className="text-sm font-medium text-espresso">جدول القياسات{entries.length > 1 ? ` — ${entry.label}` : ""}</p>
+                  {hasCm && (
                     <div role="radiogroup" aria-label="وحدة القياس" className="inline-flex rounded-full border border-line bg-paper p-0.5 text-xs">
                       {(["cm", "in"] as const).map((u) => (
                         <button
@@ -228,20 +195,20 @@ export function SizeGuide({
                     <caption className="sr-only">قياسات المقاسات {unit === "cm" ? "بالسنتيمتر" : "بالإنش"}</caption>
                     <thead>
                       <tr className="bg-bone/60 text-[0.75rem] text-taupe">
-                        {table.headers.map((h, i) => (
-                          <th key={h} scope="col" className={cn("px-2 py-3 font-medium", i === 0 && "text-espresso")}>
+                        {guide.headers.map((h, i) => (
+                          <th key={`${h}-${i}`} scope="col" className={cn("px-2 py-3 font-medium", i === 0 && "text-espresso")}>
                             {h}
-                            {table.units[i] === "cm" && <span className="block text-[0.65rem] font-normal text-mist">{unit === "cm" ? "سم" : "إنش"}</span>}
+                            {guide.cm[i] && <span className="block text-[0.65rem] font-normal text-mist">{unit === "cm" ? "سم" : "إنش"}</span>}
                           </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {table.rows.map((r) => {
-                        const active = selectedSize === r.size;
+                      {guide.rows.map((r, ri) => {
+                        const active = selectedSize === r[0];
                         return (
-                          <tr key={r.size} className={cn("border-t border-line tabular-nums transition-colors", active ? "bg-copper/10" : "")} aria-current={active ? "true" : undefined}>
-                            {r.values.map((v, i) =>
+                          <tr key={`${r[0]}-${ri}`} className={cn("border-t border-line tabular-nums transition-colors", active ? "bg-copper/10" : "")} aria-current={active ? "true" : undefined}>
+                            {r.map((v, i) =>
                               i === 0 ? (
                                 <th key={i} scope="row" className="px-2 py-3.5 font-semibold text-espresso">
                                   {v}
@@ -249,7 +216,7 @@ export function SizeGuide({
                                 </th>
                               ) : (
                                 <td key={i} className="px-2 py-3.5 text-umber">
-                                  {fmt(v, table.units[i])}
+                                  {fmt(v, !!guide.cm[i])}
                                 </td>
                               ),
                             )}
@@ -259,12 +226,12 @@ export function SizeGuide({
                     </tbody>
                   </table>
                 </div>
-                <p className="mt-3 text-xs leading-6 text-taupe">{table.note}</p>
+                {guide.note && <p className="mt-3 text-xs leading-6 text-taupe">{guide.note}</p>}
 
-                <h3 className="display mt-9 text-xl text-espresso">كيف أختار مقاسي؟</h3>
+                {guide.tips.length > 0 && <h3 className="display mt-9 text-xl text-espresso">كيف أختار مقاسي؟</h3>}
                 <ol className="mt-4 space-y-5">
-                  {TIPS[kind].map((t, i) => (
-                    <li key={t.title} className="flex gap-4">
+                  {guide.tips.map((t, i) => (
+                    <li key={`${t.title}-${i}`} className="flex gap-4">
                       <span className="latin-italic mt-0.5 w-5 shrink-0 text-xl leading-none text-copper">{i + 1}</span>
                       <div>
                         <p className="text-sm font-medium text-espresso">{t.title}</p>

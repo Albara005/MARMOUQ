@@ -121,6 +121,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
         product={product}
         initialColor={initialColor}
         details={<ProductDetails product={product} policies={{ shipping: settings.policies.shipping, returns: settings.policies.returns }} />}
+        sizeGuides={settings.sizeGuides}
       />
 
       <div className="h-20 md:h-28" aria-hidden />

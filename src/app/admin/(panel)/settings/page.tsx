@@ -4,6 +4,8 @@ import { ArrowUpLeft } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { getMediaRefs, listCategories, listLooks, listProducts } from "@/lib/catalog";
+import { db } from "@/db";
+import { products as productsTable } from "@/db/schema";
 import { PageHeader } from "@/components/admin/ui";
 import { SettingsForm } from "@/components/admin/settings/settings-form";
 
@@ -15,12 +17,18 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const settings = await getSettings();
   const ids = [settings.hero.mediaId, settings.hero.mobileMediaId].filter((x): x is string => !!x);
-  const [refs, products, looks, categories] = await Promise.all([
+  const [refs, products, looks, categories, guideRows] = await Promise.all([
     ids.length ? getMediaRefs(ids) : Promise.resolve([]),
     listProducts({ limit: 100 }),
     listLooks(50),
     listCategories(),
+    db.select({ guide: productsTable.sizeGuide, parts: productsTable.setParts }).from(productsTable),
   ]);
+  const guideUsage: Record<string, number> = {};
+  for (const r of guideRows) {
+    const ids = new Set([r.guide, ...(r.parts ?? []).map((p) => p.guide)]);
+    for (const id of ids) guideUsage[id] = (guideUsage[id] ?? 0) + 1;
+  }
   // listProducts caps a page at 100 — fetch a second page for the section builder's picker (up to 200)
   const more = products.total > products.items.length ? (await listProducts({ limit: 100, offset: 100 })).items : [];
   const heroMedia = refs.find((m) => m.id === settings.hero.mediaId);
@@ -57,6 +65,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         productOptions={productOptions}
         lookOptions={lookOptions}
         catalog={catalog}
+        guideUsage={guideUsage}
         initialTab={typeof sp.tab === "string" ? sp.tab : "identity"} />
     </div>
   );

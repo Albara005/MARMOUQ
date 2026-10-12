@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, Blocks, Coins, CreditCard, ExternalLink, FileText, Globe, House, LayoutTemplate, Megaphone, Palette, Plus, Search, Store, Truck, CircleAlert } from "lucide-react";
+import { ArrowLeft, Blocks, Coins, Ruler, CreditCard, ExternalLink, FileText, Globe, House, LayoutTemplate, Megaphone, Palette, Plus, Search, Store, Truck, CircleAlert } from "lucide-react";
 import type { BarTone, HomeSectionKey, MarketCurrency, StoreSettings } from "@/lib/settings";
 import type { MediaLike } from "@/components/ui/media-image";
 import { formatMoney, type Currency } from "@/lib/money";
@@ -12,18 +12,20 @@ import { ImageUploader } from "@/components/admin/image-uploader";
 import { saveSettingsAction } from "@/app/admin/(panel)/settings/actions";
 import { ListEditor } from "./list-editors";
 import { SectionsEditor, setBuiltinEnabled } from "./sections-editor";
+import { SizeGuidesEditor } from "./size-guides-editor";
 import type { SectionsCatalog } from "./block-meta";
 import { resolveHomeLayout } from "@/lib/blocks";
 import { COPY_GROUPS, DEFAULT_NAV, type NavLink } from "@/lib/copy";
 import { CARRIER_PRESETS, TRACKING_PLACEHOLDER, buildTrackingUrl, newCarrierId, type Carrier } from "@/lib/carriers";
 
-type TabId = "identity" | "brand" | "home" | "sections" | "pages" | "bars" | "markets" | "payments" | "shipping" | "policies" | "seo";
+type TabId = "identity" | "brand" | "home" | "sections" | "pages" | "sizes" | "bars" | "markets" | "payments" | "shipping" | "policies" | "seo";
 const TABS: { id: TabId; label: string; icon: typeof Store; prefixes: string[] }[] = [
   { id: "identity", label: "الهوية والتواصل", icon: Store, prefixes: ["storeName", "storeNameEn", "tagline", "description", "whatsapp", "phone", "email", "instagram", "tiktok", "address", "workingHours"] },
   { id: "brand", label: "الهوية البصرية", icon: Palette, prefixes: ["theme", "brand", "nav"] },
   { id: "home", label: "الواجهة الرئيسية", icon: House, prefixes: ["hero", "testimonials", "home"] },
   { id: "sections", label: "الأقسام والصفحات", icon: Blocks, prefixes: ["layouts", "customPages"] },
   { id: "pages", label: "صفحات المتجر", icon: LayoutTemplate, prefixes: ["copy", "faq"] },
+  { id: "sizes", label: "دليل المقاسات", icon: Ruler, prefixes: ["sizeGuides"] },
   { id: "bars", label: "الأشرطة الإعلانية", icon: Megaphone, prefixes: ["bars", "announcements"] },
   { id: "markets", label: "العملات والأسواق", icon: Coins, prefixes: ["markets"] },
   { id: "payments", label: "المدفوعات", icon: CreditCard, prefixes: ["payments"] },
@@ -77,6 +79,7 @@ export function SettingsForm({
   productOptions = [],
   lookOptions = [],
   catalog = EMPTY_CATALOG,
+  guideUsage = {},
   initialTab,
 }: {
   initial: StoreSettings;
@@ -86,6 +89,8 @@ export function SettingsForm({
   lookOptions?: { slug: string; title: string }[];
   /** products / categories / looks offered by the section builder */
   catalog?: SectionsCatalog;
+  /** products using each size guide id */
+  guideUsage?: Record<string, number>;
   initialTab: string;
 }) {
   const [s, setS] = useState<StoreSettings>(initial);
@@ -534,6 +539,15 @@ export function SettingsForm({
               onNavigate={goToTab}
               marqueeOn={s.bars.marquee.enabled && s.bars.marquee.items.length > 0}
             />
+          </div>
+
+          {/* ── Size guides ── */}
+          <div role="tabpanel" id="panel-sizes" aria-labelledby="tab-sizes" hidden={tab !== "sizes"} className="space-y-5">
+            <div className="rounded-2xl border border-copper/20 bg-copper/[0.05] px-5 py-4 text-[0.85rem] leading-7 text-umber">
+              عدّل جداول المقاسات اللي تظهر للعميل في صفحة المنتج (زر «دليل المقاسات»): المقاسات، القياسات، الملاحظة والنصائح.
+              تختار الدليل لكل منتج من صفحة المنتج، وللطقم (قميص + بنطلون) تختار دليلاً لكل قطعة.
+            </div>
+            <SizeGuidesEditor guides={s.sizeGuides} onChange={(sizeGuides) => set("sizeGuides", sizeGuides)} usage={guideUsage} />
           </div>
 
           {/* ── Payments ── */}

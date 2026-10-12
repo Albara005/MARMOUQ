@@ -6,7 +6,8 @@ import { settings } from "@/db/schema";
 import { DEFAULT_CURRENCY, type Currency } from "@/lib/money";
 import { DEFAULT_NAV, resolveCopy, type NavLink } from "@/lib/copy";
 import type { CustomPage, HomeSectionKey, Layouts } from "@/lib/blocks";
-import type { Carrier } from "@/lib/carriers";
+import { DEFAULT_CARRIERS, type Carrier } from "@/lib/carriers";
+import { DEFAULT_SIZE_GUIDES, type SizeGuideDef } from "@/lib/size-guides";
 import { cookies } from "next/headers";
 
 export type PaymentAccount = { bank: string; holder: string; number: string };
@@ -101,6 +102,8 @@ export type StoreSettings = {
   customPages: CustomPage[];
   /** Shipping companies + their tracking-link templates (see src/lib/carriers.ts) */
   carriers: Carrier[];
+  /** Size guide tables shown on product pages (see src/lib/size-guides.ts) */
+  sizeGuides: SizeGuideDef[];
   home: {
     /** Legacy on/off switches — only used until the home layout is customised (layouts.home) */
     sections: Record<HomeSectionKey, boolean>;
@@ -174,7 +177,8 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   brand: { logoId: null, logoHeight: 40 },
   layouts: {},
   customPages: [],
-  carriers: [],
+  carriers: DEFAULT_CARRIERS,
+  sizeGuides: DEFAULT_SIZE_GUIDES,
   bars: {
     announcement: { enabled: true, tone: "espresso", href: "", interval: 5 },
     marquee: { enabled: true, tone: "ivory", items: ["قطن 100%", "صنع إيطالي 🇮🇹", "قصّات مدروسة", "توصيل لكل المحافظات", "الدفع عند الاستلام", "استبدال سهل"], speed: 38 },

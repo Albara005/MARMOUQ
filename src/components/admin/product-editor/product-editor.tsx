@@ -14,7 +14,6 @@ import { checkProductSlugAction, saveProductAction } from "@/app/admin/(panel)/p
 import {
   BRAND_COLORS,
   PRODUCT_STATUS_META,
-  SIZE_GUIDE_LABELS,
   SIZE_PRESETS,
   variantKey,
   type CategoryOption,
@@ -27,9 +26,11 @@ import {
   type SizeGuide,
 } from "./types";
 import { cn, slugify } from "@/lib/utils";
+import { DEFAULT_SET_PARTS, SET_LIMITS, SET_SEPARATOR, formatSetSize, isSetProduct, setCombos, type SetPart } from "@/lib/size-guides";
 import { formatMoney, percentOff } from "@/lib/money";
 
-type Props = { initial: ProductEditorData; categories: CategoryOption[]; currencySymbol: string };
+type GuideOption = { id: string; name: string };
+type Props = { initial: ProductEditorData; categories: CategoryOption[]; currencySymbol: string; sizeGuides?: GuideOption[] };
 
 /** Rebuild the colour × size grid, keeping existing rows (ids, stock, sku…) where they still exist. */
 function buildVariants(colors: EditorColor[], sizes: string[], prev: EditorVariant[]): EditorVariant[] {
@@ -46,7 +47,7 @@ function buildVariants(colors: EditorColor[], sizes: string[], prev: EditorVaria
   return out;
 }
 
-export function ProductEditor({ initial, categories, currencySymbol }: Props) {
+export function ProductEditor({ initial, categories, currencySymbol, sizeGuides = [] }: Props) {
   const router = useRouter();
   const [d, setD] = useState<ProductEditorData>(initial);
   const [slugTouched, setSlugTouched] = useState(Boolean(initial.id));
@@ -88,8 +89,17 @@ export function ProductEditor({ initial, categories, currencySymbol }: Props) {
     return () => window.removeEventListener("beforeunload", onBefore);
   }, []);
 
-  const setColors = (colors: EditorColor[]) => setD((p) => ({ ...p, colors, variants: buildVariants(colors, p.sizes, p.variants) }));
+  const setColors = (colors: EditorColor[]) => setD((p) => ({ ...p, colors, variants: buildVariants(colors, isSetProduct(p.setParts) ? setCombos(p.setParts) : p.sizes, p.variants) }));
   const setSizes = (sizes: string[]) => setD((p) => ({ ...p, sizes, variants: buildVariants(p.colors, sizes, p.variants) }));
+  /** Set mode: the size grid is every combination of the pieces' sizes ("L / 32"). */
+  const setParts = (parts: SetPart[] | null) => {
+    dirty.current = true;
+    setD((p) => {
+      const sizes = isSetProduct(parts) ? setCombos(parts) : p.sizes.filter((x) => !x.includes(SET_SEPARATOR));
+      return { ...p, setParts: parts, variants: buildVariants(p.colors, sizes, p.variants) };
+    });
+  };
+  const updatePart = (i: number, patch: Partial<SetPart>) => d.setParts && setParts(d.setParts.map((x, k) => (k === i ? { ...x, ...patch } : x)));
   const updateVariant = (i: number, patch: Partial<EditorVariant>) => {
     dirty.current = true;
     setD((p) => ({ ...p, variants: p.variants.map((v, idx) => (idx === i ? { ...v, ...patch } : v)) }));
@@ -152,6 +162,7 @@ export function ProductEditor({ initial, categories, currencySymbol }: Props) {
       badge: d.badge,
       sortOrder: Number(d.sortOrder) || 0,
       images: d.images.map((i) => ({ id: i.id, color: i.color })),
+      setParts: isSetProduct(d.setParts) ? d.setParts.map((x) => ({ label: x.label.trim(), guide: x.guide, sizes: x.sizes })) : null,
       variants: d.variants.map((v) => ({ ...v, stock: Number(v.stock) || 0, priceOverride: v.priceOverride ? Number(v.priceOverride) : null })),
     };
     start(async () => {
@@ -361,6 +372,45 @@ export function ProductEditor({ initial, categories, currencySymbol }: Props) {
                 </div>
               </div>
 
+              <div className="rounded-xl border border-line bg-ivory/60 p-3.5">
+                <Switch
+                  checked={isSetProduct(d.setParts)}
+                  onChange={(e) => setParts(e.target.checked ? structuredClone(DEFAULT_SET_PARTS) : null)}
+                  label={
+                    <span>
+                      <span className="block text-sm font-medium text-espresso">طقم بمقاس لكل قطعة</span>
+                      <span className="block text-xs text-taupe">مثل قميص + بنطلون: يختار العميل مقاس القميص ومقاس البنطلون كلٌّ على حدة.</span>
+                    </span>
+                  }
+                />
+              </div>
+
+              {isSetProduct(d.setParts) ? (
+                <div className="space-y-3">
+                  {d.setParts.map((part, i) => (
+                    <SetPartEditor
+                      key={i}
+                      index={i}
+                      part={part}
+                      guides={sizeGuides}
+                      canRemove={d.setParts!.length > 2}
+                      onChange={(patch) => updatePart(i, patch)}
+                      onRemove={() => setParts(d.setParts!.filter((_, k) => k !== i))}
+                    />
+                  ))}
+                  {d.setParts.length < SET_LIMITS.parts && (
+                    <button
+                      type="button"
+                      onClick={() => setParts([...d.setParts!, { label: "القطعة الثالثة", guide: "none", sizes: ["M", "L", "XL"] }])}
+                      className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm text-copper-deep hover:bg-bone"
+                    >
+                      <Plus className="size-4" aria-hidden />
+                      إضافة قطعة (مثل الصديري)
+                    </button>
+                  )}
+                  {err("setParts") && <p className="text-xs text-danger">{err("setParts")}</p>}
+                </div>
+              ) : (
               <div>
                 <p className="mb-2 text-sm font-medium text-umber">المقاسات</p>
                 <div className="flex flex-wrap gap-2">
@@ -383,6 +433,7 @@ export function ProductEditor({ initial, categories, currencySymbol }: Props) {
                   <Input value={newSize} onChange={(e) => setNewSize(e.target.value)} placeholder="مقاس آخر" className="h-9 w-28" onKeyDown={(e) => e.key === "Enter" && newSize.trim() && (e.preventDefault(), addSizes([newSize]), setNewSize(""))} />
                 </div>
               </div>
+              )}
 
               <div className="rounded-xl border border-line">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-ivory px-4 py-3">
@@ -414,7 +465,7 @@ export function ProductEditor({ initial, categories, currencySymbol }: Props) {
                           <td className="px-4 py-2">
                             <span className="flex items-center gap-2">
                               {v.color && <span className="size-3.5 rounded-full ring-1 ring-black/10" style={{ background: v.colorHex || "#ccc" }} aria-hidden />}
-                              <span className="text-espresso">{[v.color, v.size].filter(Boolean).join(" / ") || "الخيار الافتراضي"}</span>
+                              <span className="text-espresso">{[v.color, isSetProduct(d.setParts) ? formatSetSize(d.setParts, v.size) : v.size].filter(Boolean).join(" / ") || "الخيار الافتراضي"}</span>
                               {v.id && d.orderedVariantIds.includes(v.id) && <span className="text-[0.65rem] text-mist">· عليه طلبات</span>}
                             </span>
                           </td>
@@ -508,13 +559,25 @@ export function ProductEditor({ initial, categories, currencySymbol }: Props) {
                 </Select>
               </Field>
               <Field label="دليل المقاسات" htmlFor="sizeGuide">
-                <Select id="sizeGuide" value={d.sizeGuide} onChange={(e) => set("sizeGuide", e.target.value as SizeGuide)}>
-                  {(Object.keys(SIZE_GUIDE_LABELS) as SizeGuide[]).map((k) => (
-                    <option key={k} value={k}>
-                      {SIZE_GUIDE_LABELS[k]}
+                <Select id="sizeGuide" value={d.sizeGuide} onChange={(e) => set("sizeGuide", e.target.value as SizeGuide)} disabled={isSetProduct(d.setParts)}>
+                  {sizeGuides.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
                     </option>
                   ))}
+                  {!sizeGuides.some((g) => g.id === d.sizeGuide) && d.sizeGuide !== "none" && <option value={d.sizeGuide}>دليل محذوف</option>}
+                  <option value="none">بدون دليل مقاسات</option>
                 </Select>
+                <p className="mt-1.5 text-xs leading-5 text-taupe">
+                  {isSetProduct(d.setParts) ? "للطقم: اختر دليلاً لكل قطعة في قسم المقاسات." : (
+                    <>
+                      تعدّل الجداول من{" "}
+                      <Link href="/admin/settings?tab=sizes" className="text-copper-deep underline-offset-2 hover:underline">
+                        الإعدادات ← دليل المقاسات
+                      </Link>
+                    </>
+                  )}
+                </p>
               </Field>
             </div>
           </Card>
@@ -548,3 +611,77 @@ function IconBtn({ label, onClick, disabled, children }: { label: string; onClic
   );
 }
 
+
+/** One piece of a set: its name, size guide and sizes. */
+function SetPartEditor({
+  index,
+  part,
+  guides,
+  canRemove,
+  onChange,
+  onRemove,
+}: {
+  index: number;
+  part: SetPart;
+  guides: GuideOption[];
+  canRemove: boolean;
+  onChange: (patch: Partial<SetPart>) => void;
+  onRemove: () => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const add = (sizes: string[]) => {
+    const next = [...part.sizes];
+    for (const raw of sizes) {
+      const s = raw.trim().replace(/\//g, "-");
+      if (s && !next.includes(s) && next.length < SET_LIMITS.sizesPerPart) next.push(s);
+    }
+    onChange({ sizes: next });
+  };
+  return (
+    <div className="rounded-xl border border-line bg-paper p-3.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="grid size-7 shrink-0 place-items-center rounded-full bg-espresso text-xs text-copper-soft tabular-nums">{index + 1}</span>
+        <Input aria-label={`اسم القطعة ${index + 1}`} value={part.label} onChange={(e) => onChange({ label: e.target.value })} className="h-9 w-36" maxLength={20} />
+        <Select aria-label={`دليل مقاسات القطعة ${index + 1}`} value={part.guide} onChange={(e) => onChange({ guide: e.target.value })} className="h-9 w-auto min-w-40 text-sm">
+          {guides.map((g) => (
+            <option key={g.id} value={g.id}>
+              دليل: {g.name}
+            </option>
+          ))}
+          <option value="none">بدون دليل</option>
+        </Select>
+        {canRemove && (
+          <button type="button" onClick={onRemove} className="ms-auto grid size-8 place-items-center rounded-full text-taupe hover:bg-danger/10 hover:text-danger" aria-label={`حذف القطعة ${part.label}`}>
+            <X className="size-4" />
+          </button>
+        )}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {part.sizes.map((s) => (
+          <span key={s} className="inline-flex h-8 items-center gap-1 rounded-full border border-line bg-ivory pe-1 ps-3 text-sm tabular-nums">
+            {s}
+            <button type="button" onClick={() => onChange({ sizes: part.sizes.filter((x) => x !== s) })} className="grid size-6 place-items-center rounded-full text-taupe hover:bg-bone hover:text-danger" aria-label={`حذف مقاس ${s} من ${part.label}`}>
+              <X className="size-3" />
+            </button>
+          </span>
+        ))}
+        {part.sizes.length === 0 && <span className="text-sm text-danger">أضف مقاساً واحداً على الأقل</span>}
+      </div>
+      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+        {SIZE_PRESETS.filter((p) => p.sizes[0] !== "").map((p) => (
+          <button key={p.label} type="button" onClick={() => add(p.sizes)} className="h-8 rounded-full bg-bone px-3 text-xs text-umber hover:bg-sand">
+            {p.label}
+          </button>
+        ))}
+        <Input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="مقاس آخر"
+          aria-label={`مقاس آخر لـ ${part.label}`}
+          className="h-8 w-24 text-sm"
+          onKeyDown={(e) => e.key === "Enter" && draft.trim() && (e.preventDefault(), add([draft]), setDraft(""))}
+        />
+      </div>
+    </div>
+  );
+}

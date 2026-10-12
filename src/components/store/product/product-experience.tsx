@@ -10,7 +10,8 @@ import { useCart, useWishlist } from "@/components/store/cart/cart-provider";
 import { QuantityStepper } from "@/components/store/quantity-stepper";
 import { sortSizes } from "@/components/store/product-card";
 import { ProductGallery } from "@/components/store/product/gallery";
-import { SizeGuide } from "@/components/store/product/size-guide";
+import { SizeGuide, type SizeGuideEntry } from "@/components/store/product/size-guide";
+import { findGuide, formatSetSize, isSetProduct, setSizeKey, splitSetSize, type SizeGuideDef } from "@/lib/size-guides";
 import type { ProductDetail, ProductImage, VariantData } from "@/lib/catalog";
 import { percentOff } from "@/lib/money";
 import { cn, whatsappLink } from "@/lib/utils";
@@ -43,9 +44,12 @@ export function ProductExperience({
   product,
   initialColor,
   details,
+  sizeGuides = [],
 }: {
   product: ProductDetail;
   initialColor: string | null;
+  /** size guide tables from settings */
+  sizeGuides?: SizeGuideDef[];
   /** Server-rendered accordions (description, materials, care, shipping) */
   details: React.ReactNode;
 }) {
@@ -76,7 +80,10 @@ export function ProductExperience({
     for (const v of variantsForColor) if (!bySize.has(v.size)) bySize.set(v.size, v);
     return sortSizes([...bySize.values()]);
   }, [variantsForColor]);
-  const needsSize = sizeOptions.some((v) => v.size !== "");
+  // Sets (shirt + trousers…): one size per piece; the variant size is "L / 32"
+  const parts = isSetProduct(product.setParts) ? product.setParts : null;
+  const [pieces, setPieces] = useState<(string | null)[]>(() => (parts ? parts.map(() => null) : []));
+  const needsSize = parts ? true : sizeOptions.some((v) => v.size !== "");
 
   const [size, setSize] = useState<string | null>(() => {
     const only = sizeOptions.filter((v) => v.stock > 0);
@@ -86,9 +93,54 @@ export function ProductExperience({
   const [error, setError] = useState("");
   const [added, setAdded] = useState(false);
 
-  const variant: VariantData | null = needsSize
-    ? (sizeOptions.find((v) => v.size === size) ?? null)
-    : (variantsForColor.find((v) => v.stock > 0) ?? variantsForColor[0] ?? null);
+  const variant: VariantData | null = parts
+    ? pieces.every(Boolean)
+      ? (variantsForColor.find((v) => v.size === setSizeKey(pieces as string[])) ?? null)
+      : null
+    : needsSize
+      ? (sizeOptions.find((v) => v.size === size) ?? null)
+      : (variantsForColor.find((v) => v.stock > 0) ?? variantsForColor[0] ?? null);
+  /** What the customer chose, for labels ("القميص L · البنطلون 32" for sets) */
+  const sizeLabel = parts ? (variant ? formatSetSize(parts, variant.size) : null) : size;
+  const missingPieces = parts ? parts.filter((_, i) => !pieces[i]).map((p) => p.label) : [];
+  const guideEntries: SizeGuideEntry[] = parts
+    ? parts.flatMap((p, i) => {
+        const guide = findGuide(sizeGuides, p.guide);
+        return guide ? [{ label: p.label, guide, selected: pieces[i] }] : [];
+      })
+    : (() => {
+        const guide = findGuide(sizeGuides, product.sizeGuide);
+        return guide ? [{ label: "", guide, selected: size }] : [];
+      })();
+
+  /** Piece i can take `value` when an in-stock variant matches it and the other chosen pieces. */
+  const pieceState = (i: number, value: string): "ok" | "out" | "missing" => {
+    if (!parts) return "missing";
+    let exists = false;
+    for (const v of variantsForColor) {
+      const vals = splitSetSize(v.size, parts.length);
+      if (vals[i] !== value) continue;
+      exists = true;
+      if (v.stock > 0 && pieces.every((p, k) => k === i || !p || vals[k] === p)) return "ok";
+    }
+    return exists ? "out" : "missing";
+  };
+  const choosePiece = (i: number, value: string) => {
+    setError("");
+    setPieces((prev) => {
+      const next = prev.map((p, k) => (k === i ? value : p));
+      // drop other choices that no longer combine with this one in stock
+      return next.map((p, k) => {
+        if (k === i || !p || !parts) return p;
+        const ok = variantsForColor.some((v) => {
+          const vals = splitSetSize(v.size, parts.length);
+          return v.stock > 0 && vals[i] === value && vals[k] === p;
+        });
+        return ok ? p : null;
+      });
+    });
+  };
+
   const colorStock = color ? (stockByColor.get(color) ?? 0) : product.totalStock;
   const soldOut = !product.inStock || colorStock <= 0;
   const maxQty = Math.max(1, Math.min(20, variant?.stock ?? 1));
@@ -111,6 +163,10 @@ export function ProductExperience({
       const v = product.variants.find((x) => x.color === name && x.size === size);
       if (!v || v.stock <= 0) setSize(null);
     }
+    if (parts && pieces.every(Boolean)) {
+      const v = product.variants.find((x) => x.color === name && x.size === setSizeKey(pieces as string[]));
+      if (!v || v.stock <= 0) setPieces(parts.map(() => null));
+    }
     try {
       const url = new URL(window.location.href);
       url.searchParams.set("color", name);
@@ -126,7 +182,7 @@ export function ProductExperience({
   const addToCart = useCallback(() => {
     if (soldOut) return;
     if (needsSize && !variant) {
-      setError("اختر مقاسك أولاً");
+      setError(parts ? (missingPieces.length ? `اختر مقاس ${missingPieces.join(" و")} أولاً` : "هذا التركيب غير متوفر حالياً — جرّب مقاساً آخر") : "اختر مقاسك أولاً");
       sizeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       (sizeRef.current?.querySelector("button:not([disabled])") as HTMLButtonElement | null)?.focus({ preventScroll: true });
       return;
@@ -143,7 +199,7 @@ export function ProductExperience({
       name: product.name,
       color: variant.color,
       colorHex: variant.colorHex,
-      size: variant.size,
+      size: parts ? formatSetSize(parts, variant.size) : variant.size,
       unitPrice: variant.price,
       compareAtPrice: product.compareAtPrice,
       imageId: thumb?.id ?? null,
@@ -154,7 +210,7 @@ export function ProductExperience({
     });
     setAdded(true);
     window.setTimeout(() => setAdded(false), 2200);
-  }, [soldOut, needsSize, variant, cart, product, thumb, qty]);
+  }, [soldOut, needsSize, variant, cart, product, thumb, qty, parts, missingPieces]);
 
   // Mobile sticky bar: visible once the main CTA has scrolled above the viewport.
   const [showBar, setShowBar] = useState(false);
@@ -181,7 +237,7 @@ export function ProductExperience({
       "مرحباً مرموق 👋 حاب أطلب:",
       `• ${product.name}`,
       color ? `• اللون: ${color}` : null,
-      variant?.size ? `• المقاس: ${variant.size}` : needsSize ? "• المقاس: (ساعدوني أختار)" : null,
+      sizeLabel ? `• المقاس: ${sizeLabel}` : needsSize ? "• المقاس: (ساعدوني أختار)" : null,
       `• الكمية: ${qty}`,
       `• السعر: ${money(price * qty)}`,
       productUrl(),
@@ -286,17 +342,55 @@ export function ProductExperience({
               <div ref={sizeRef} className="mt-6 scroll-mt-32">
                 <div className="flex items-center justify-between">
                   <p id="size-label" className="text-sm text-taupe">
-                    المقاس{size ? <>: <span className="font-medium text-espresso">{size}</span></> : null}
+                    {parts ? "المقاسات — اختر مقاس كل قطعة" : <>المقاس{size ? <>: <span className="font-medium text-espresso">{size}</span></> : null}</>}
                   </p>
-                  {product.sizeGuide !== "none" && (
-                    <SizeGuide
-                      kind={product.sizeGuide}
-                      selectedSize={size}
-                      helpHref={helpHref}
-                      helpLabel={config.whatsapp ? "اسألنا على واتساب" : "راسلنا على إنستغرام"}
-                    />
-                  )}
+                  {guideEntries.length > 0 && <SizeGuide entries={guideEntries} helpHref={helpHref} helpLabel={config.whatsapp ? "اسألنا على واتساب" : "راسلنا على إنستغرام"} />}
                 </div>
+                {parts ? (
+                  <div className="mt-3 space-y-4">
+                    {parts.map((part, i) => (
+                      <div key={`${part.label}-${i}`}>
+                        <p id={`piece-label-${i}`} className="mb-2 text-[0.82rem] text-umber">
+                          {part.label}
+                          {pieces[i] ? (
+                            <>
+                              : <span className="font-medium tabular-nums text-espresso">{pieces[i]}</span>
+                            </>
+                          ) : null}
+                        </p>
+                        <div role="radiogroup" aria-labelledby={`piece-label-${i}`} aria-invalid={(!!error && !pieces[i]) || undefined} className="grid grid-cols-[repeat(auto-fill,minmax(3.75rem,1fr))] gap-2">
+                          {part.sizes.map((value) => {
+                            const st = pieceState(i, value);
+                            if (st === "missing") return null;
+                            const active = pieces[i] === value;
+                            const out = st === "out";
+                            return (
+                              <button
+                                key={value}
+                                type="button"
+                                role="radio"
+                                aria-checked={active}
+                                disabled={out && !active}
+                                aria-label={`مقاس ${part.label} ${value}${out ? " — غير متوفر مع اختيارك" : ""}`}
+                                onClick={() => choosePiece(i, value)}
+                                className={cn(
+                                  "relative h-12 rounded-xl border text-sm font-medium tabular-nums transition-[background-color,border-color,color] duration-300",
+                                  active
+                                    ? "border-espresso bg-espresso text-paper"
+                                    : out
+                                      ? "cursor-not-allowed border-line bg-transparent text-mist [background-image:linear-gradient(to_top_left,transparent_calc(50%-0.5px),var(--color-sand)_50%,transparent_calc(50%+0.5px))]"
+                                      : "border-line bg-paper text-espresso hover:border-espresso/60",
+                                )}
+                              >
+                                {value}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
                 <div
                   role="radiogroup"
                   aria-labelledby="size-label"
@@ -335,6 +429,7 @@ export function ProductExperience({
                     );
                   })}
                 </div>
+                )}
                 <div className="mt-2 min-h-6 text-[0.8rem]" aria-live="polite">
                   {error ? (
                     <p role="alert" className="text-danger">
@@ -458,7 +553,7 @@ export function ProductExperience({
             <p className="truncate text-xs text-taupe">
               <span className="tabular-nums text-umber">{money(price)}</span>
               {color ? ` · ${color}` : ""}
-              {size ? ` · ${size}` : needsSize ? " · اختر المقاس" : ""}
+              {sizeLabel ? ` · ${sizeLabel}` : needsSize ? (parts ? " · اختر المقاسات" : " · اختر المقاس") : ""}
             </p>
           </div>
           <button
