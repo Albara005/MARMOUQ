@@ -4,6 +4,8 @@ import { useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, CircleAlert, CircleCheck, ExternalLink, PenLine, Plus, Search, X } from "lucide-react";
 import {
   BLOCK_LIMITS,
+  STORE_TIME_ZONE,
+  countdownEndMs,
   BLOCK_TONES,
   FEATURE_ICONS,
   parseVideoUrl,
@@ -261,7 +263,7 @@ const HREF_HINT = (
   </>
 );
 
-function HeadingFields<T extends Block & { eyebrow: string; title: string }>({ b, set, path, id, body }: EditorProps<T> & { body?: { key: "subtitle" | "text"; label: string; rows?: number } }) {
+function HeadingFields<T extends Block & { eyebrow: string; title: string }>({ b, set, path, id, body }: EditorProps<T> & { body?: { key: "subtitle" | "text"; label: string; rows?: number; max?: number } }) {
   const f = binder(b, set, path, id);
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -272,7 +274,7 @@ function HeadingFields<T extends Block & { eyebrow: string; title: string }>({ b
           className="sm:col-span-2"
           label={body.label}
           rows={body.rows ?? 3}
-          maxLength={body.key === "subtitle" ? LIMITS.subtitle : LIMITS.text}
+          maxLength={body.max ?? (body.key === "subtitle" ? LIMITS.subtitle : LIMITS.text)}
           {...f(body.key as keyof T & string)}
         />
       )}
@@ -303,7 +305,7 @@ function BannerEditor(p: EditorProps<BannerBlock>) {
         </div>
       </Group>
       <Group title="النص">
-        <HeadingFields {...p} body={{ key: "text", label: "النص", rows: 2 }} />
+        <HeadingFields {...p} body={{ key: "text", label: "النص", max: 600, rows: 2 }} />
         <CtaFields {...p} />
       </Group>
       <Group title="المظهر">
@@ -502,7 +504,7 @@ function ProductPicker({ id, path, ids, products, max, onChange }: { id: string;
         </FieldLabel>
         <div className="relative">
           <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-mist" aria-hidden />
-          <Input id={`${id}-q`} type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث باسم المنتج…" className="h-10 ps-9 text-sm" autoComplete="off" />
+          <Input id={`${id}-q`} type="search" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && e.preventDefault()} placeholder="ابحث باسم المنتج…" className="h-10 ps-9 text-sm" autoComplete="off" />
         </div>
         {full && <Hint tone="warn">{`وصلت للحد الأقصى (${countAr(max, PIECES)}) — أزل قطعة لإضافة أخرى.`}</Hint>}
         <ul className="mt-2 max-h-72 space-y-0.5 overflow-y-auto overscroll-contain rounded-xl border border-line bg-paper p-1" aria-label="نتائج البحث">
@@ -535,7 +537,7 @@ function TextEditor(p: EditorProps<TextBlock>) {
   return (
     <>
       <Group>
-        <HeadingFields {...p} body={{ key: "text", label: "النص", rows: 5 }} />
+        <HeadingFields {...p} body={{ key: "text", label: "النص", max: 1500, rows: 5 }} />
         <CtaFields {...p} />
       </Group>
       <Group title="المظهر">
@@ -583,7 +585,7 @@ function ImageTextEditor(p: EditorProps<ImageTextBlock>) {
         </div>
       </Group>
       <Group title="النص">
-        <HeadingFields {...p} body={{ key: "text", label: "النص", rows: 4 }} />
+        <HeadingFields {...p} body={{ key: "text", label: "النص", max: 1500, rows: 4 }} />
         <CtaFields {...p} />
       </Group>
     </>
@@ -752,7 +754,7 @@ function VideoEditor(p: EditorProps<VideoBlock>) {
           <TextField label="رابط الفيديو" ltr placeholder="https://www.youtube.com/watch?v=…" maxLength={500} {...f("url")} />
           <div aria-live="polite">{status ?? <Hint>يوتيوب، فيميو، أو رابط مباشر لملف {ltr(".mp4")} أو {ltr(".webm")}</Hint>}</div>
         </div>
-        <HeadingFields {...p} body={{ key: "text", label: "نص قصير (اختياري)", rows: 2 }} />
+        <HeadingFields {...p} body={{ key: "text", label: "نص قصير (اختياري)", max: 600, rows: 2 }} />
       </Group>
       <Group title="ملف الفيديو المباشر">
         <div className="grid gap-5 md:grid-cols-2">
@@ -841,7 +843,7 @@ function NewsletterEditor(p: EditorProps<NewsletterBlock>) {
   const { b, set, path, id } = p;
   return (
     <Group>
-      <HeadingFields {...p} body={{ key: "text", label: "النص", rows: 2 }} />
+      <HeadingFields {...p} body={{ key: "text", label: "النص", max: 400, rows: 2 }} />
       <ToneField name={`${id}-tone`} path={`${path}.tone`} value={b.tone} onChange={(tone) => set({ tone })} />
       <Hint>يُحفظ البريد في قائمة العملاء المشتركين.</Hint>
     </Group>
@@ -879,13 +881,13 @@ function FaqEditor(p: EditorProps<FaqBlock>) {
   );
 }
 
-const DATE_FMT = new Intl.DateTimeFormat("ar-YE-u-nu-latn", { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "numeric", minute: "2-digit" });
+const DATE_FMT = new Intl.DateTimeFormat("ar-YE-u-nu-latn", { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: STORE_TIME_ZONE });
 
 function CountdownEditor(p: EditorProps<CountdownBlock>) {
   const { b, set, path, id } = p;
   const f = binder(b, set, path, id);
   const err = useFieldError(`${path}.endsAt`);
-  const date = b.endsAt ? new Date(b.endsAt) : null;
+  const date = b.endsAt ? new Date(countdownEndMs(b.endsAt)) : null;
   const valid = date && !Number.isNaN(date.getTime());
   return (
     <>
@@ -911,7 +913,7 @@ function CountdownEditor(p: EditorProps<CountdownBlock>) {
         </div>
       </Group>
       <Group title="النص">
-        <HeadingFields {...p} body={{ key: "text", label: "النص (اختياري)", rows: 2 }} />
+        <HeadingFields {...p} body={{ key: "text", label: "النص (اختياري)", max: 400, rows: 2 }} />
         <CtaFields {...p} />
         <ToneField name={`${id}-tone`} path={`${path}.tone`} value={b.tone} onChange={(tone) => set({ tone })} />
       </Group>

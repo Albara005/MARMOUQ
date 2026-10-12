@@ -16,6 +16,8 @@ import {
   PRODUCT_STATUS_META,
   SIZE_PRESETS,
   variantKey,
+  ADDON_LIMIT,
+  type AddonOption,
   type CategoryOption,
   type EditorColor,
   type EditorImage,
@@ -30,7 +32,7 @@ import { DEFAULT_SET_PARTS, SET_LIMITS, SET_SEPARATOR, formatSetSize, isSetProdu
 import { formatMoney, percentOff } from "@/lib/money";
 
 type GuideOption = { id: string; name: string };
-type Props = { initial: ProductEditorData; categories: CategoryOption[]; currencySymbol: string; sizeGuides?: GuideOption[] };
+type Props = { initial: ProductEditorData; categories: CategoryOption[]; currencySymbol: string; sizeGuides?: GuideOption[]; addonOptions?: AddonOption[] };
 
 /** Rebuild the colour × size grid, keeping existing rows (ids, stock, sku…) where they still exist. */
 function buildVariants(colors: EditorColor[], sizes: string[], prev: EditorVariant[]): EditorVariant[] {
@@ -47,7 +49,7 @@ function buildVariants(colors: EditorColor[], sizes: string[], prev: EditorVaria
   return out;
 }
 
-export function ProductEditor({ initial, categories, currencySymbol, sizeGuides = [] }: Props) {
+export function ProductEditor({ initial, categories, currencySymbol, sizeGuides = [], addonOptions = [] }: Props) {
   const router = useRouter();
   const [d, setD] = useState<ProductEditorData>(initial);
   const [slugTouched, setSlugTouched] = useState(Boolean(initial.id));
@@ -96,7 +98,8 @@ export function ProductEditor({ initial, categories, currencySymbol, sizeGuides 
     dirty.current = true;
     setD((p) => {
       const sizes = isSetProduct(parts) ? setCombos(parts) : p.sizes.filter((x) => !x.includes(SET_SEPARATOR));
-      return { ...p, setParts: parts, variants: buildVariants(p.colors, sizes, p.variants) };
+      // fall back to the loaded rows so toggling set mode off/on keeps stock, SKUs and prices
+      return { ...p, setParts: parts, variants: buildVariants(p.colors, sizes, [...initial.variants, ...p.variants]) };
     });
   };
   const updatePart = (i: number, patch: Partial<SetPart>) => d.setParts && setParts(d.setParts.map((x, k) => (k === i ? { ...x, ...patch } : x)));
@@ -163,6 +166,7 @@ export function ProductEditor({ initial, categories, currencySymbol, sizeGuides 
       sortOrder: Number(d.sortOrder) || 0,
       images: d.images.map((i) => ({ id: i.id, color: i.color })),
       setParts: isSetProduct(d.setParts) ? d.setParts.map((x) => ({ label: x.label.trim(), guide: x.guide, sizes: x.sizes })) : null,
+      addonIds: d.addonIds,
       variants: d.variants.map((v) => ({ ...v, stock: Number(v.stock) || 0, priceOverride: v.priceOverride ? Number(v.priceOverride) : null })),
     };
     start(async () => {
@@ -505,6 +509,10 @@ export function ProductEditor({ initial, categories, currencySymbol, sizeGuides 
               {err("variants") && <p className="text-xs text-danger">{err("variants")}</p>}
             </div>
           </Card>
+
+          <Card title="إضافات مع المنتج" description="قطع يقدر العميل يضيفها مع هذا المنتج من نفس الصفحة — مثل ساعة أو جوتي مع الطقم.">
+            <AddonsPicker value={d.addonIds} options={addonOptions} money={money} onChange={(ids) => set("addonIds", ids)} />
+          </Card>
         </div>
 
         {/* ── Side column ── */}
@@ -648,6 +656,7 @@ function SetPartEditor({
               دليل: {g.name}
             </option>
           ))}
+          {part.guide !== "none" && !guides.some((g) => g.id === part.guide) && <option value={part.guide}>دليل محذوف</option>}
           <option value="none">بدون دليل</option>
         </Select>
         {canRemove && (
@@ -682,6 +691,72 @@ function SetPartEditor({
           onKeyDown={(e) => e.key === "Enter" && draft.trim() && (e.preventDefault(), add([draft]), setDraft(""))}
         />
       </div>
+    </div>
+  );
+}
+
+/** Pick other products offered as add-ons on this product's page (ordered, max ADDON_LIMIT). */
+function AddonsPicker({ value, options, money, onChange }: { value: number[]; options: AddonOption[]; money: (n: number) => string; onChange: (ids: number[]) => void }) {
+  const [q, setQ] = useState("");
+  const byId = new Map(options.map((o) => [o.id, o]));
+  const chosen = value.map((id) => byId.get(id)).filter((o): o is AddonOption => !!o);
+  const full = chosen.length >= ADDON_LIMIT;
+  const term = q.trim();
+  const results = options.filter((o) => !o.isSet && !value.includes(o.id) && (!term || o.name.includes(term))).slice(0, 8);
+  const thumb = (id: string | null) =>
+    id ? <img src={`/media/${id}/sm`} alt="" className="size-10 shrink-0 rounded-lg object-cover" /> : <span className="size-10 shrink-0 rounded-lg bg-bone" aria-hidden />;
+
+  return (
+    <div className="space-y-3">
+      {chosen.length > 0 ? (
+        <ol className="space-y-2">
+          {chosen.map((o, i) => (
+            <li key={o.id} className="flex items-center gap-3 rounded-xl border border-line bg-paper p-2 pe-1">
+              {thumb(o.imageId)}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm text-espresso">{o.name}</p>
+                <p className="text-xs tabular-nums text-taupe">
+                  {money(o.price)}
+                  {o.status !== "active" && <span className="ms-2 text-warning">· غير منشور (لن يظهر)</span>}
+                </p>
+              </div>
+              <IconBtn label={`نقل ${o.name} للأعلى`} onClick={() => onChange(swap(value, value.indexOf(o.id), value.indexOf(o.id) - 1))} disabled={i === 0}>
+                <ArrowUp className="size-4" />
+              </IconBtn>
+              <IconBtn label={`نقل ${o.name} للأسفل`} onClick={() => onChange(swap(value, value.indexOf(o.id), value.indexOf(o.id) + 1))} disabled={i === chosen.length - 1}>
+                <ArrowDown className="size-4" />
+              </IconBtn>
+              <IconBtn label={`إزالة ${o.name}`} onClick={() => onChange(value.filter((x) => x !== o.id))}>
+                <X className="size-4" />
+              </IconBtn>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="rounded-xl border border-dashed border-sand px-4 py-4 text-center text-sm text-taupe">لا توجد إضافات — ابحث عن منتج بالأسفل لإضافته.</p>
+      )}
+
+      {!full && (
+        <div>
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث عن منتج (ساعة، جوتي…)" aria-label="بحث عن منتج لإضافته" className="h-10 text-sm" />
+          <ul className="mt-2 max-h-64 space-y-0.5 overflow-y-auto rounded-xl border border-line bg-paper p-1" aria-label="منتجات يمكن إضافتها">
+            {results.map((o) => (
+              <li key={o.id}>
+                <button type="button" onClick={() => onChange([...value, o.id])} className="flex w-full items-center gap-3 rounded-lg p-1.5 text-start transition-colors hover:bg-ivory">
+                  {thumb(o.imageId)}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm text-espresso">{o.name}</span>
+                    <span className="block text-xs tabular-nums text-taupe">{money(o.price)}</span>
+                  </span>
+                  <Plus className="size-4 shrink-0 text-copper" aria-hidden />
+                </button>
+              </li>
+            ))}
+            {results.length === 0 && <li className="px-3 py-3 text-center text-xs text-taupe">{term ? "لا نتائج" : "لا توجد منتجات أخرى"}</li>}
+          </ul>
+        </div>
+      )}
+      <p className="text-xs text-taupe">{`${chosen.length}/${ADDON_LIMIT} — الأطقم ذات المقاسات المتعددة لا تُضاف كإضافة.`}</p>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { Check, Globe2, LoaderCircle, Plus, RefreshCw, TriangleAlert } from "lucide-react";
 import type { MarketCurrency, StoreSettings } from "@/lib/settings";
 import { formatMoney, type Currency } from "@/lib/money";
-import { CURRENCY_CATALOG, PARALLEL_RATE_CURRENCIES, autoBasePerUnit, catalogCurrency, usdInBase } from "@/lib/currency-catalog";
+import { CURRENCY_CATALOG, PARALLEL_RATE_CURRENCIES, autoBasePerUnit, catalogCurrency, isManualRate, usdInBase } from "@/lib/currency-catalog";
 import { Input, Select, Switch } from "@/components/ui/field";
 import { ActionFieldError } from "@/components/admin/ui-client";
 import { refreshRatesAction } from "@/app/admin/(panel)/settings/actions";
@@ -18,7 +18,8 @@ const fmtRate = (n: number) => (n >= 100 ? n.toLocaleString("en-US", { maximumFr
 
 function fromCatalog(code: string): MarketCurrency {
   const c = catalogCurrency(code)!;
-  return { code: c.code, symbol: c.symbol, label: c.label, position: c.position, decimals: c.decimals, roundTo: c.roundTo, basePerUnit: 0, markup: 0, enabled: true, rateMode: "auto" };
+  // parallel-rate currencies (YER…) have no reliable market feed — the merchant types their rate
+  return { code: c.code, symbol: c.symbol, label: c.label, position: c.position, decimals: c.decimals, roundTo: c.roundTo, basePerUnit: 0, markup: 0, enabled: true, rateMode: PARALLEL_RATE_CURRENCIES.has(c.code) ? "manual" : "auto" };
 }
 
 /** Currencies & markets: pick currencies, rates come from the live feed; visitors see their own currency. */
@@ -199,7 +200,8 @@ export function MarketsEditor({ markets, base, fx: initialFx, onChange }: { mark
 }
 
 function CurrencyLine({ c, i, base, usd, fx, onChange }: { c: MarketCurrency; i: number; base: Currency; usd: number | null; fx: FxInfo; onChange: (next: MarketCurrency) => void }) {
-  const manual = c.rateMode === "manual";
+  const manual = isManualRate(c);
+  const parallel = PARALLEL_RATE_CURRENCIES.has(c.code);
   const rate = manual ? c.basePerUnit : autoBasePerUnit(c.code, usd, fx?.rates);
   const preview: Currency = { code: c.code, symbol: c.symbol || c.code, position: c.position, basePerUnit: rate, markup: c.markup, decimals: c.decimals, roundTo: c.roundTo };
   const p = `markets.currencies.${i}`;
@@ -216,7 +218,7 @@ function CurrencyLine({ c, i, base, usd, fx, onChange }: { c: MarketCurrency; i:
                 1 {c.symbol || c.code} = {fmtRate(rate)} {base.symbol} · {manual ? "سعر يدوي" : "تلقائي"}
               </>
             ) : (
-              <span className="text-warning">{manual ? "اكتب سعر الصرف" : "بانتظار سعر الدولار أعلاه"}</span>
+              <span className="text-warning">{manual ? (parallel ? "سعر السوق لهذه العملة يختلف عن الرسمي — اكتب سعر الصرف" : "اكتب سعر الصرف") : parallel ? "هذه العملة تحتاج سعراً يدوياً" : "بانتظار سعر الدولار أعلاه"}</span>
             )}
           </p>
         </div>
@@ -262,7 +264,7 @@ function CurrencyLine({ c, i, base, usd, fx, onChange }: { c: MarketCurrency; i:
               aria-label="طريقة سعر الصرف"
               className="h-10 text-sm"
               value={manual ? "manual" : "auto"}
-              onChange={(e) => onChange({ ...c, rateMode: e.target.value as "auto" | "manual", basePerUnit: e.target.value === "manual" ? Math.round(rate) || 0 : c.basePerUnit })}
+              onChange={(e) => onChange({ ...c, rateMode: e.target.value as "auto" | "manual", basePerUnit: e.target.value === "manual" ? Number(rate.toPrecision(6)) || 0 : c.basePerUnit })}
             >
               <option value="auto">تلقائي</option>
               <option value="manual">يدوي</option>

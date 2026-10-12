@@ -9,7 +9,7 @@ import { hasRole, requireAdmin } from "@/lib/auth";
 import { slugify } from "@/lib/utils";
 import { actionError, actionOk, zodFieldErrors, type ActionResult } from "@/components/admin/action-result";
 import { isMediaId } from "@/components/admin/media-ids";
-import { normalizeDetails, variantKey } from "@/components/admin/product-editor/types";
+import { ADDON_LIMIT, normalizeDetails, variantKey } from "@/components/admin/product-editor/types";
 import { SET_LIMITS, setCombos } from "@/lib/size-guides";
 
 /* ───────────── Validation ───────────── */
@@ -70,6 +70,11 @@ const payloadSchema = z
       .min(2, "الطقم يحتاج قطعتين على الأقل")
       .max(SET_LIMITS.parts, `${SET_LIMITS.parts} قطع كحد أقصى`)
       .nullable(),
+    addonIds: z
+      .array(z.number().int().positive())
+      .max(ADDON_LIMIT, `${ADDON_LIMIT} إضافات كحد أقصى`)
+      .transform((ids) => [...new Set(ids)])
+      .catch([]),
     price: money("السعر").min(1, "حدّد سعر البيع"),
     compareAtPrice: money("سعر المقارنة").nullable(),
     status: z.enum(["active", "draft", "archived"]),
@@ -86,7 +91,7 @@ const payloadSchema = z
     }
     if (v.setParts) {
       const combos = new Set(setCombos(v.setParts));
-      if (v.variants.some((x) => !combos.has(x.size))) ctx.addIssue({ code: "custom", path: ["setParts"], message: "مقاسات الطقم لا تطابق جدول الخيارات — أعد تحميل الصفحة" });
+      if (v.variants.some((x) => x.isActive && !combos.has(x.size))) ctx.addIssue({ code: "custom", path: ["setParts"], message: "مقاسات الطقم لا تطابق جدول الخيارات — أعد تحميل الصفحة" });
     }
     const seen = new Set<string>();
     for (const variant of v.variants) {
@@ -216,6 +221,7 @@ export async function saveProductAction(input: unknown): Promise<ActionResult> {
         badge: v.badge,
         sizeGuide: v.sizeGuide,
         setParts: v.setParts,
+        addonIds: v.addonIds.filter((id) => id !== v.id),
         sortOrder: v.sortOrder,
         updatedAt: new Date(),
       };
@@ -352,6 +358,7 @@ export async function duplicateProductAction(id: number): Promise<ActionResult> 
           badge: src.badge,
           sizeGuide: src.sizeGuide,
           setParts: src.setParts,
+          addonIds: src.addonIds,
           sortOrder: src.sortOrder,
         })
         .returning({ id: products.id });

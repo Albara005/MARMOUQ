@@ -201,7 +201,8 @@ export async function placeOrder(raw: unknown): Promise<PlaceOrderResult> {
           shippingFee: totals.shipping,
           total: totals.total,
           couponCode: couponRow?.code ?? "",
-          displayCurrency: isForeign(display) ? display : null,
+          // only when it is still the currency the customer saw at checkout
+          displayCurrency: isForeign(display) && display.code === (input.currencyCode || "").toUpperCase() ? display : null,
           shippingZoneId: zone.id,
         })
         .returning({ id: orders.id });

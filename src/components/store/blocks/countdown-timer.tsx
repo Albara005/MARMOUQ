@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useSyncExternalStore } from "react";
-import type { CountdownBlock } from "@/lib/blocks";
+import { countdownEndMs, type CountdownBlock } from "@/lib/blocks";
 import { cn } from "@/lib/utils";
 import { BlockEyebrow } from "./block-heading";
 import { BlockCta } from "./block-link";
@@ -48,13 +48,13 @@ function split(ms: number): string[] {
 }
 
 /**
- * Countdown band. `endsAt` is a store-local ISO date-time ("2026-11-28T21:00"), read in the
- * visitor's clock. After the end it shows `endedText`, or removes itself when that is empty.
+ * Countdown band. `endsAt` is a store-local ISO date-time ("2026-11-28T21:00", store time —
+ * the same instant for every visitor). After the end it shows `endedText`, or removes itself when that is empty.
  * `ended` lets the server short-circuit dates that are already well in the past.
  */
 export function CountdownTimer({ block, ended: endedOnServer = false }: { block: CountdownBlock; ended?: boolean }) {
   const now = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  const end = new Date(txt(block.endsAt)).getTime();
+  const end = countdownEndMs(txt(block.endsAt));
   if (Number.isNaN(end)) return null;
 
   const left = endedOnServer ? 0 : now > 0 ? Math.max(0, end - now) : null;

@@ -20,9 +20,13 @@ const TIMEOUT_MS = 5000;
 let memory: FxTable | null = null;
 let inflight: Promise<FxTable | null> | null = null;
 
-async function fetchJson(url: string): Promise<unknown> {
-  // cached by Next for a few hours (also keeps static pages static)
-  const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS), next: { revalidate: TTL_MS / 1000 }, headers: { accept: "application/json" } });
+async function fetchJson(url: string, fresh: boolean): Promise<unknown> {
+  // normally cached by Next for a few hours (also keeps static pages static); the dashboard button fetches fresh
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+    ...(fresh ? { cache: "no-store" as const } : { next: { revalidate: TTL_MS / 1000 } }),
+    headers: { accept: "application/json" },
+  });
   if (!res.ok) throw new Error(`${url} → ${res.status}`);
   return res.json();
 }
@@ -36,10 +40,10 @@ function clean(rates: Record<string, unknown>): Record<string, number> {
   return out;
 }
 
-async function fetchRemote(): Promise<FxTable | null> {
+async function fetchRemote(fresh = false): Promise<FxTable | null> {
   const now = new Date().toISOString();
   try {
-    const d = (await fetchJson("https://open.er-api.com/v6/latest/USD")) as { result?: string; rates?: Record<string, unknown>; time_last_update_unix?: number };
+    const d = (await fetchJson("https://open.er-api.com/v6/latest/USD", fresh)) as { result?: string; rates?: Record<string, unknown>; time_last_update_unix?: number };
     if (d.result === "success" && d.rates) {
       const rates = clean(d.rates);
       if (rates.EUR && rates.SAR) return { rates, updatedAt: d.time_last_update_unix ? new Date(d.time_last_update_unix * 1000).toISOString() : now, fetchedAt: now, source: "open.er-api.com" };
@@ -49,7 +53,7 @@ async function fetchRemote(): Promise<FxTable | null> {
     console.warn("[fx] primary feed failed:", (err as Error).message);
   }
   try {
-    const d = (await fetchJson("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json")) as { date?: string; usd?: Record<string, unknown> };
+    const d = (await fetchJson("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json", fresh)) as { date?: string; usd?: Record<string, unknown> };
     if (d.usd) {
       const rates = clean(d.usd);
       rates.USD = 1;
@@ -72,10 +76,15 @@ async function readStored(): Promise<FxTable | null> {
   }
 }
 
-async function refresh(): Promise<FxTable | null> {
+let lastFailureAt = 0;
+const RETRY_AFTER_MS = 5 * 60 * 1000;
+
+async function refresh(fresh = false): Promise<FxTable | null> {
+  if (!fresh && Date.now() - lastFailureAt < RETRY_AFTER_MS) return memory;
   inflight ??= (async () => {
     try {
-      const table = await fetchRemote();
+      const table = await fetchRemote(fresh);
+      if (!table) lastFailureAt = Date.now();
       if (table) {
         memory = table;
         await db
@@ -97,12 +106,12 @@ const isStale = (t: FxTable) => Date.now() - Date.parse(t.fetchedAt) > TTL_MS;
 /** Current rates (never throws; null only when no rate was ever obtained). */
 export async function getFxTable(): Promise<FxTable | null> {
   if (!memory) memory = await readStored();
-  if (!memory) return refresh();
-  if (isStale(memory)) void refresh();
+  // never make a customer wait on the network: fetch in the background, use what we have
+  if (!memory || isStale(memory)) void refresh().catch(() => null);
   return memory;
 }
 
-/** Forces a refresh (dashboard «تحديث الأسعار الآن»). */
+/** Forces a fresh fetch (dashboard «تحديث الأسعار الآن»). */
 export async function refreshFxNow(): Promise<FxTable | null> {
-  return refresh();
+  return refresh(true);
 }

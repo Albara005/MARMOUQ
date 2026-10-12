@@ -66,8 +66,16 @@ export function usdInBase(base: string, usdRate: number, rates: Record<string, n
 
 /** How many base units one unit of `code` is worth, from live rates (0 = unknown). */
 export function autoBasePerUnit(code: string, usdBase: number | null, rates: Record<string, number> | null | undefined): number {
-  const perUsd = code.toUpperCase() === "USD" ? 1 : rates?.[code.toUpperCase()];
-  return usdBase && perUsd ? Math.round((usdBase / perUsd) * 1e6) / 1e6 : 0;
+  const c = code.toUpperCase();
+  // the feed's official rate for these is not the market price — they need a manual rate
+  if (PARALLEL_RATE_CURRENCIES.has(c)) return 0;
+  const perUsd = c === "USD" ? 1 : rates?.[c];
+  return usdBase && perUsd ? Number((usdBase / perUsd).toPrecision(8)) : 0;
+}
+
+/** Legacy currencies (saved before automatic rates) keep the rate the merchant typed. */
+export function isManualRate(c: { rateMode?: "auto" | "manual"; basePerUnit: number }): boolean {
+  return c.rateMode === "manual" || (c.rateMode == null && c.basePerUnit > 0);
 }
 
 const BY_CODE = new Map(CURRENCY_CATALOG.map((c) => [c.code, c]));

@@ -20,7 +20,7 @@ export function slugify(input: string): string {
   return input
     .trim()
     .toLowerCase()
-    .replace(/[ً-ٰٟـ]/g, "") // tashkeel + tatweel
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, "") // tashkeel + tatweel
     .replace(/[^\p{L}\p{N}]+/gu, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);

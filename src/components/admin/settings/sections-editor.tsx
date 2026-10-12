@@ -290,7 +290,7 @@ function CustomPageSettings({
           <label htmlFor={`${id}-desc`} className={label}>
             وصف محركات البحث والمشاركة
           </label>
-          <Textarea id={`${id}-desc`} rows={2} className="min-h-0 text-sm" maxLength={300} value={page.description} onChange={(e) => onChange({ description: e.target.value })} />
+          <Textarea id={`${id}-desc`} rows={2} className="min-h-0 text-sm" maxLength={200} value={page.description} onChange={(e) => onChange({ description: e.target.value })} />
           {err("description") ? <ActionFieldError name={`${p}.description`} /> : <p className="mt-1.5 text-xs text-taupe">{`${page.description.length}/160 حرفاً مثالياً — يظهر في Google وعند مشاركة الرابط.`}</p>}
         </div>
       </div>

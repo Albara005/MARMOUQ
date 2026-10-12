@@ -11,6 +11,7 @@ import { QuantityStepper } from "@/components/store/quantity-stepper";
 import { sortSizes } from "@/components/store/product-card";
 import { ProductGallery } from "@/components/store/product/gallery";
 import { SizeGuide, type SizeGuideEntry } from "@/components/store/product/size-guide";
+import { AddonsPicker, resolveAddon, type AddonChoice } from "@/components/store/product/addons-picker";
 import { findGuide, formatSetSize, isSetProduct, setSizeKey, splitSetSize, type SizeGuideDef } from "@/lib/size-guides";
 import type { ProductDetail, ProductImage, VariantData } from "@/lib/catalog";
 import { percentOff } from "@/lib/money";
@@ -91,6 +92,15 @@ export function ProductExperience({
   });
   const [qty, setQty] = useState(1);
   const [error, setError] = useState("");
+  // Add-ons (watch, shoes…) ticked by the customer
+  const [addonChoices, setAddonChoices] = useState<Record<number, AddonChoice>>({});
+  const [addonMissing, setAddonMissing] = useState<number[]>([]);
+  const chosenAddons = product.addons.filter((a) => addonChoices[a.id]?.on);
+  const addonsTotal = chosenAddons.reduce((sum, a) => sum + (resolveAddon(a, addonChoices[a.id])?.price ?? a.price), 0);
+  const setAddon = (id: number, next: AddonChoice) => {
+    setAddonChoices((prev) => ({ ...prev, [id]: next }));
+    setAddonMissing((prev) => prev.filter((x) => x !== id));
+  };
   const [added, setAdded] = useState(false);
 
   const variant: VariantData | null = parts
@@ -114,16 +124,23 @@ export function ProductExperience({
       })();
 
   /** Piece i can take `value` when an in-stock variant matches it and the other chosen pieces. */
-  const pieceState = (i: number, value: string): "ok" | "out" | "missing" => {
+  /**
+   * "ok": in stock with the other chosen pieces · "out": only with other sizes (still clickable —
+   * picking it clears the clashing choice) · "sold": no stock at all · "missing": not offered.
+   */
+  const pieceState = (i: number, value: string): "ok" | "out" | "sold" | "missing" => {
     if (!parts) return "missing";
     let exists = false;
+    let anyStock = false;
     for (const v of variantsForColor) {
       const vals = splitSetSize(v.size, parts.length);
       if (vals[i] !== value) continue;
       exists = true;
-      if (v.stock > 0 && pieces.every((p, k) => k === i || !p || vals[k] === p)) return "ok";
+      if (v.stock <= 0) continue;
+      anyStock = true;
+      if (pieces.every((p, k) => k === i || !p || vals[k] === p)) return "ok";
     }
-    return exists ? "out" : "missing";
+    return !exists ? "missing" : anyStock ? "out" : "sold";
   };
   const choosePiece = (i: number, value: string) => {
     setError("");
@@ -191,8 +208,35 @@ export function ProductExperience({
       setError("هذا الخيار غير متوفر حالياً");
       return;
     }
+    const missingAddons = chosenAddons.filter((a) => !resolveAddon(a, addonChoices[a.id])).map((a) => a.id);
+    if (missingAddons.length) {
+      setAddonMissing(missingAddons);
+      setError("اختر مقاس الإضافات اللي حدّدتها");
+      document.getElementById("addons-title")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
     setError("");
-    cart.add({
+    const addonLines = chosenAddons.map((a) => {
+      const v = resolveAddon(a, addonChoices[a.id])!;
+      const img = (v.color ? a.images.find((i) => i.color === v.color) : null) ?? a.images[0];
+      return {
+        variantId: v.id,
+        productId: a.id,
+        slug: a.slug,
+        name: a.name,
+        color: v.color,
+        colorHex: v.colorHex,
+        size: v.size,
+        unitPrice: v.price,
+        compareAtPrice: a.compareAtPrice,
+        imageId: img?.id ?? null,
+        imageBlur: img?.blur,
+        maxQuantity: v.stock,
+        lookId: null,
+        quantity: 1,
+      };
+    });
+    cart.addMany([{
       variantId: variant.id,
       productId: product.id,
       slug: product.slug,
@@ -207,10 +251,10 @@ export function ProductExperience({
       maxQuantity: variant.stock,
       lookId: null,
       quantity: qty,
-    });
+    }, ...addonLines]);
     setAdded(true);
     window.setTimeout(() => setAdded(false), 2200);
-  }, [soldOut, needsSize, variant, cart, product, thumb, qty, parts, missingPieces]);
+  }, [soldOut, needsSize, variant, cart, product, thumb, qty, parts, missingPieces, chosenAddons, addonChoices]);
 
   // Mobile sticky bar: visible once the main CTA has scrolled above the viewport.
   const [showBar, setShowBar] = useState(false);
@@ -363,15 +407,15 @@ export function ProductExperience({
                             const st = pieceState(i, value);
                             if (st === "missing") return null;
                             const active = pieces[i] === value;
-                            const out = st === "out";
+                            const out = st === "out" || st === "sold";
                             return (
                               <button
                                 key={value}
                                 type="button"
                                 role="radio"
                                 aria-checked={active}
-                                disabled={out && !active}
-                                aria-label={`مقاس ${part.label} ${value}${out ? " — غير متوفر مع اختيارك" : ""}`}
+                                disabled={st === "sold" && !active}
+                                aria-label={`مقاس ${part.label} ${value}${st === "sold" ? " — نفد" : out ? " — متوفر مع مقاس آخر" : ""}`}
                                 onClick={() => choosePiece(i, value)}
                                 className={cn(
                                   "relative h-12 rounded-xl border text-sm font-medium tabular-nums transition-[background-color,border-color,color] duration-300",
@@ -462,6 +506,28 @@ export function ProductExperience({
               </p>
             )}
             {!needsSize && error && (
+              <p role="alert" className="mt-2 text-[0.8rem] text-danger">
+                {error}
+              </p>
+            )}
+
+            <AddonsPicker
+              addons={product.addons}
+              choices={addonChoices}
+              onChange={setAddon}
+              title={config.copy["product.addonsTitle"] ?? "أكمل إطلالتك"}
+              hint={config.copy["product.addonsHint"] ?? ""}
+              missing={addonMissing}
+            />
+            {chosenAddons.length > 0 && (
+              <p className="mt-4 flex items-baseline justify-between text-sm text-umber" aria-live="polite">
+                <span>
+                  المجموع مع {chosenAddons.length === 1 ? "الإضافة" : `${chosenAddons.length} إضافات`}
+                </span>
+                <span className="font-semibold tabular-nums text-espresso">{money(price * qty + addonsTotal)}</span>
+              </p>
+            )}
+            {addonMissing.length > 0 && error && (
               <p role="alert" className="mt-2 text-[0.8rem] text-danger">
                 {error}
               </p>

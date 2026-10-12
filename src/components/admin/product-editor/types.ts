@@ -49,6 +49,8 @@ export type ProductEditorData = {
   sizes: string[];
   /** Set sold with a size per piece (shirt + trousers…); null = one size list */
   setParts: SetPart[] | null;
+  /** Add-on products offered on this product's page (watch, shoes…) */
+  addonIds: number[];
   variants: EditorVariant[];
   /** Variants that appear on past orders (cannot be hard-deleted) */
   orderedVariantIds: number[];
@@ -79,8 +81,13 @@ export type ProductPayload = {
   sortOrder: number;
   images: { id: string; color: string }[];
   setParts: SetPart[] | null;
+  addonIds: number[];
   variants: EditorVariant[];
 };
+
+/** A product that can be offered as an add-on (for the picker). */
+export type AddonOption = { id: number; name: string; price: number; imageId: string | null; status: ProductStatus; isSet: boolean };
+export const ADDON_LIMIT = 6;
 
 export const PRODUCT_STATUS_META: Record<ProductStatus, { label: string; tone: "success" | "neutral" | "warning" }> = {
   active: { label: "منشور", tone: "success" },

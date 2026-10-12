@@ -8,12 +8,12 @@ import { imagesForColor } from "@/lib/product-images";
 import type { LookData } from "@/lib/catalog";
 import { ScriptSafe } from "@/components/ui/script-safe";
 
-export function LookOfSeason({ look, eyebrow = "Look of the Season" }: { look: LookData; eyebrow?: string }) {
+export function LookOfSeason({ look, eyebrow = "Look of the Season", titleId = "look-title" }: { look: LookData; eyebrow?: string; titleId?: string }) {
   if (look.items.length === 0) return null;
   const savings = look.total - look.bundleTotal;
 
   return (
-    <section aria-labelledby="look-title" className="relative bg-bone py-20 md:py-28">
+    <section aria-labelledby={titleId} className="relative bg-bone py-20 md:py-28">
       <div className="container-luxe grid items-center gap-12 lg:grid-cols-12 lg:gap-16">
         <div className="lg:col-span-6" data-reveal>
           <LookHotspots look={look} sizes="(min-width: 1024px) 46vw, 100vw" />
@@ -25,7 +25,7 @@ export function LookOfSeason({ look, eyebrow = "Look of the Season" }: { look: L
             <span className="h-px w-8 bg-gold/70" aria-hidden />
             <ScriptSafe text={eyebrow} />
           </p>
-          <h2 id="look-title" className="display mt-4 text-[2.4rem] leading-[1.12] text-espresso text-balance md:text-6xl">
+          <h2 id={titleId} className="display mt-4 text-[2.4rem] leading-[1.12] text-espresso text-balance md:text-6xl">
             {look.title}
           </h2>
           {(look.subtitle || look.description) && (

@@ -2,7 +2,7 @@ import Link from "next/link";
 import Form from "next/form";
 import { Fragment } from "react";
 import { Search } from "lucide-react";
-import { and, eq, gt, inArray } from "drizzle-orm";
+import { and, eq, gt, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { productVariants } from "@/db/schema";
 import { copyOf, getDisplayCurrency, getSettings } from "@/lib/settings";
@@ -18,6 +18,7 @@ import { ShopEmptyState } from "@/components/store/catalog/empty-state";
 import { PAGE_SIZE, activeFilterCount, piecesLabel, shopHref, type ShopParams } from "@/components/store/catalog/params";
 import { cn } from "@/lib/utils";
 import { PageBlocks } from "@/components/store/blocks/page-blocks";
+import { SET_SEPARATOR } from "@/lib/size-guides";
 
 type Tile = { key: string; product: ProductCardData; color?: string };
 
@@ -46,7 +47,7 @@ async function coloursInStockForSize(productIds: number[], size: string): Promis
   const rows = await db
     .select({ productId: productVariants.productId, color: productVariants.color })
     .from(productVariants)
-    .where(and(inArray(productVariants.productId, productIds), eq(productVariants.size, size), eq(productVariants.isActive, true), gt(productVariants.stock, 0)));
+    .where(and(inArray(productVariants.productId, productIds), sql`${size} = any(string_to_array(${productVariants.size}, ${SET_SEPARATOR}))`, eq(productVariants.isActive, true), gt(productVariants.stock, 0)));
   return new Set(rows.map((r) => `${r.productId}:${r.color}`));
 }
 

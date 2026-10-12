@@ -2,7 +2,7 @@ import "server-only";
 import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { categories, media, orderItems, productImages, products, productVariants } from "@/db/schema";
-import { normalizeDetails, type CategoryOption, type EditorColor, type ProductEditorData } from "@/components/admin/product-editor/types";
+import { normalizeDetails, type AddonOption, type CategoryOption, type EditorColor, type ProductEditorData } from "@/components/admin/product-editor/types";
 
 export async function listCategoryOptions(): Promise<CategoryOption[]> {
   return db.select({ id: categories.id, name: categories.name, slot: categories.slot }).from(categories).orderBy(asc(categories.sortOrder), asc(categories.id));
@@ -32,6 +32,7 @@ export function emptyProduct(): ProductEditorData {
     colors: [],
     sizes: [],
     setParts: null,
+    addonIds: [],
     variants: [],
     orderedVariantIds: [],
     unitsSold: 0,
@@ -91,6 +92,7 @@ export async function loadProductForEditor(id: number): Promise<ProductEditorDat
     colors,
     sizes: cleanSizes,
     setParts: Array.isArray(p.setParts) && p.setParts.length >= 2 ? p.setParts : null,
+    addonIds: Array.isArray(p.addonIds) ? p.addonIds : [],
     variants: vars.map((v) => ({
       id: v.id,
       color: v.color,
@@ -112,4 +114,15 @@ export async function orderedProductIds(ids: number[]): Promise<Set<number>> {
   if (!ids.length) return new Set();
   const rows = await db.selectDistinct({ id: orderItems.productId }).from(orderItems).where(inArray(orderItems.productId, ids));
   return new Set(rows.map((r) => r.id).filter((x): x is number => x != null));
+}
+
+/** Every product (with its cover image) for the add-ons picker. */
+export async function listAddonOptions(): Promise<AddonOption[]> {
+  const [rows, covers] = await Promise.all([
+    db.select({ id: products.id, name: products.name, price: products.price, status: products.status, setParts: products.setParts }).from(products).orderBy(asc(products.name)),
+    db.select({ productId: productImages.productId, mediaId: productImages.mediaId }).from(productImages).orderBy(asc(productImages.sortOrder), asc(productImages.id)),
+  ]);
+  const cover = new Map<number, string>();
+  for (const c of covers) if (!cover.has(c.productId)) cover.set(c.productId, c.mediaId);
+  return rows.map((r) => ({ id: r.id, name: r.name, price: r.price, status: r.status, imageId: cover.get(r.id) ?? null, isSet: Array.isArray(r.setParts) && r.setParts.length >= 2 }));
 }

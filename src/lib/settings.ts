@@ -10,7 +10,7 @@ import { DEFAULT_CARRIERS, type Carrier } from "@/lib/carriers";
 import { DEFAULT_SIZE_GUIDES, type SizeGuideDef } from "@/lib/size-guides";
 import { cookies, headers } from "next/headers";
 import { getFxTable, type FxTable } from "@/lib/fx";
-import { COUNTRY_COOKIE, autoBasePerUnit, currencyForCountry, usdInBase } from "@/lib/currency-catalog";
+import { COUNTRY_COOKIE, autoBasePerUnit, currencyForCountry, isManualRate, usdInBase } from "@/lib/currency-catalog";
 
 export type PaymentAccount = { bank: string; holder: string; number: string };
 
@@ -236,8 +236,11 @@ function merge<T>(base: T, patch: unknown): T {
 /** Store settings merged over defaults. Deduplicated per request. Never throws (falls back to defaults). */
 export const getSettings = cache(async (): Promise<StoreSettings> => {
   try {
-    const [row, fx] = await Promise.all([db.query.settings.findFirst({ where: eq(settings.key, KEY) }), getFxTable().catch(() => null)]);
-    return applyFx(merge(DEFAULT_SETTINGS, row?.value), fx);
+    const row = await db.query.settings.findFirst({ where: eq(settings.key, KEY) });
+    const merged = merge(DEFAULT_SETTINGS, row?.value);
+    // live rates are only needed when some currency follows the market
+    const needsFx = merged.markets.currencies.some((c) => !isManualRate(c));
+    return applyFx(merged, needsFx ? await getFxTable().catch(() => null) : null);
   } catch (err) {
     console.error("[settings] falling back to defaults:", err);
     return DEFAULT_SETTINGS;
@@ -249,7 +252,7 @@ function applyFx(s: StoreSettings, fx: FxTable | null): StoreSettings {
   if (!s.markets.currencies.length) return s;
   const usd = usdInBase(s.currency.code, s.markets.usdRate, fx?.rates);
   const currencies = s.markets.currencies.map((c): MarketCurrency =>
-    c.rateMode === "manual" ? c : { ...c, rateMode: "auto", basePerUnit: autoBasePerUnit(c.code, usd, fx?.rates) },
+    isManualRate(c) ? { ...c, rateMode: "manual" } : { ...c, rateMode: "auto", basePerUnit: autoBasePerUnit(c.code, usd, fx?.rates) },
   );
   return { ...s, markets: { ...s.markets, currencies } };
 }
@@ -331,12 +334,13 @@ export async function getDisplayCurrency(s?: StoreSettings): Promise<Currency> {
   } catch {
     code = undefined;
   }
-  if (!code && !country && settings.markets.autoDetect) {
+  if (!code && settings.markets.autoDetect) {
+    // a CDN country header (when present) is more reliable than the browser's guess
     try {
       const h = await headers();
-      country = GEO_HEADERS.map((k) => h.get(k)).find((v) => v && /^[A-Za-z]{2}$/.test(v) && v.toUpperCase() !== "XX") ?? undefined;
+      country = GEO_HEADERS.map((k) => h.get(k)).find((v) => v && /^[A-Za-z]{2}$/.test(v) && v.toUpperCase() !== "XX") ?? country;
     } catch {
-      country = undefined;
+      /* keep the cookie's country */
     }
   }
   return resolveDisplayCurrency(settings, code, country);

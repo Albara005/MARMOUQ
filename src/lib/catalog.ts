@@ -53,7 +53,12 @@ export type ProductDetail = ProductCardData & {
   /** size guide id from settings ("none" = no guide) */
   sizeGuide: string;
   variants: VariantData[];
+  /** Pieces offered with this product (watch, shoes…), in the merchant's order */
+  addons: AddonProduct[];
 };
+
+/** An add-on offered on a product page, with its purchasable options. */
+export type AddonProduct = ProductCardData & { variants: VariantData[] };
 
 export type CategoryData = {
   id: number;
@@ -236,6 +241,7 @@ export const getProductBySlug = cache(async (slug: string): Promise<ProductDetai
       origin: products.origin,
       care: products.care,
       sizeGuide: products.sizeGuide,
+      addonIds: products.addonIds,
     })
     .from(products)
     .leftJoin(categories, eq(categories.id, products.categoryId))
@@ -243,12 +249,15 @@ export const getProductBySlug = cache(async (slug: string): Promise<ProductDetai
     .limit(1);
   if (!row[0]) return null;
   const r = row[0];
-  const [card] = await hydrateCards([r]);
-  const vars = await db
-    .select()
-    .from(productVariants)
-    .where(and(eq(productVariants.productId, r.id), eq(productVariants.isActive, true)))
-    .orderBy(asc(productVariants.sortOrder), asc(productVariants.id));
+  const [[card], vars, addons] = await Promise.all([
+    hydrateCards([r]),
+    db
+      .select()
+      .from(productVariants)
+      .where(and(eq(productVariants.productId, r.id), eq(productVariants.isActive, true)))
+      .orderBy(asc(productVariants.sortOrder), asc(productVariants.id)),
+    loadAddons(Array.isArray(r.addonIds) ? r.addonIds.filter((id) => id !== r.id) : []),
+  ]);
   return {
     ...card,
     description: r.description,
@@ -258,8 +267,38 @@ export const getProductBySlug = cache(async (slug: string): Promise<ProductDetai
     care: r.care,
     sizeGuide: r.sizeGuide,
     variants: vars.map((v) => ({ id: v.id, color: v.color, colorHex: v.colorHex, size: v.size, stock: v.stock, price: v.priceOverride ?? r.price })),
+    addons,
   };
 });
+
+/** Active, in-stock add-on products (sets excluded — they need a size per piece). */
+async function loadAddons(ids: number[]): Promise<AddonProduct[]> {
+  if (!ids.length) return [];
+  try {
+    const rows = await db
+      .select(cardSelect)
+      .from(products)
+      .leftJoin(categories, eq(categories.id, products.categoryId))
+      .where(and(inArray(products.id, ids.slice(0, 12)), eq(products.status, "active")));
+    const cards = await hydrateCards(rows);
+    const vars = await db
+      .select()
+      .from(productVariants)
+      .where(and(inArray(productVariants.productId, ids), eq(productVariants.isActive, true)))
+      .orderBy(asc(productVariants.sortOrder), asc(productVariants.id));
+    const byId = new Map(cards.map((c) => [c.id, c]));
+    return ids
+      .map((id) => byId.get(id))
+      .filter((c): c is ProductCardData => !!c && !c.setParts && c.inStock)
+      .map((c) => ({
+        ...c,
+        variants: vars.filter((v) => v.productId === c.id).map((v) => ({ id: v.id, color: v.color, colorHex: v.colorHex, size: v.size, stock: v.stock, price: v.priceOverride ?? c.price })),
+      }));
+  } catch (err) {
+    console.error("[catalog] add-ons unavailable", err);
+    return [];
+  }
+}
 
 /** Distinct colours & sizes across the active catalogue (for shop filters). */
 export async function getFilterFacets(category?: string): Promise<{ colors: ColorOption[]; sizes: string[]; priceMin: number; priceMax: number }> {

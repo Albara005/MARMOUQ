@@ -29,6 +29,13 @@
       "when": 1791802078806,
       "tag": "0003_product_set_parts",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791804001692,
+      "tag": "0004_product_addons",
+      "breakpoints": true
     }
   ]
 }

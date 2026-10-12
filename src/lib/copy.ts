@@ -32,6 +32,8 @@ export const COPY_GROUPS: CopyGroup[] = [
       t("product.trust1", "ميزة 1", "توصيل لكل المحافظات"),
       t("product.trust2", "ميزة 2", "الدفع عند الاستلام"),
       t("product.trust3", "ميزة 3", "استبدال خلال 3 أيام"),
+      t("product.addonsTitle", "عنوان قسم الإضافات", "أكمل إطلالتك"),
+      t("product.addonsHint", "وصف قسم الإضافات", "أضف القطع اللي تكمّل طقمك — تنضاف للسلة معه بضغطة وحدة."),
     ],
   },
   {

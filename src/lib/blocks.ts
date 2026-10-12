@@ -348,12 +348,25 @@ export function blockMediaIds(blocks: Block[]): string[] {
   return [...ids];
 }
 
+/** The store's clock (Yemen, Asia/Aden — no daylight saving): countdowns are entered in this time. */
+export const STORE_TIME_ZONE = "Asia/Aden";
+const STORE_UTC_OFFSET = "+03:00";
+
+/** End instant of a countdown ("2026-11-28T21:00" = 9 pm store time); NaN when invalid. */
+export function countdownEndMs(endsAt: string): number {
+  const v = endsAt.trim();
+  if (!v) return NaN;
+  if (/(?:z|[+-]\d{2}:?\d{2})$/i.test(v)) return Date.parse(v);
+  const full = v.includes("T") ? (v.length === 16 ? `${v}:00` : v) : `${v}T00:00:00`;
+  return Date.parse(`${full}${STORE_UTC_OFFSET}`);
+}
+
 /** URL-safe slug for custom pages (keeps Arabic letters). */
 export function pageSlug(input: string): string {
   return input
     .trim()
     .toLowerCase()
-    .replace(/[ً-ٰٟـ]/g, "")
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, "")
     .replace(/[^\p{L}\p{N}]+/gu, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 60);
