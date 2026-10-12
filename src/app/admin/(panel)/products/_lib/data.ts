@@ -33,6 +33,7 @@ export function emptyProduct(): ProductEditorData {
     sizes: [],
     setParts: null,
     addonIds: [],
+    addonDiscount: 0,
     variants: [],
     orderedVariantIds: [],
     unitsSold: 0,
@@ -93,6 +94,7 @@ export async function loadProductForEditor(id: number): Promise<ProductEditorDat
     sizes: cleanSizes,
     setParts: Array.isArray(p.setParts) && p.setParts.length >= 2 ? p.setParts : null,
     addonIds: Array.isArray(p.addonIds) ? p.addonIds : [],
+    addonDiscount: p.addonDiscount,
     variants: vars.map((v) => ({
       id: v.id,
       color: v.color,

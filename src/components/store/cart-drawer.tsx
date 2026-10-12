@@ -150,6 +150,12 @@ export function CartDrawer() {
                         {l.color && l.size && <span aria-hidden>·</span>}
                         {l.size && <span>المقاس {l.size}</span>}
                       </p>
+                      {!l.lookId && l.addonOf && (
+                        <p className="mt-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-bone px-2.5 py-1 text-[0.68rem] font-medium text-umber">
+                          {l.addonOfName ? `إضافة مع ${l.addonOfName}` : "إضافة"}
+                          {l.addonDiscountPercent ? ` · -${l.addonDiscountPercent}%` : ""}
+                        </p>
+                      )}
                       {l.lookId && (
                         <p className="mt-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-copper/10 px-2.5 py-1 text-[0.68rem] font-medium text-copper-deep">
                           <Sparkles className="size-3" aria-hidden />

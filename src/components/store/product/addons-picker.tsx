@@ -38,6 +38,7 @@ export function AddonsPicker({
   title,
   hint,
   missing,
+  discountPercent = 0,
 }: {
   addons: AddonProduct[];
   choices: Record<number, AddonChoice>;
@@ -46,6 +47,8 @@ export function AddonsPicker({
   hint: string;
   /** add-on ids that still need a size (highlighted) */
   missing: number[];
+  /** % off each add-on bought with the product */
+  discountPercent?: number;
 }) {
   const money = useMoney();
   if (!addons.length) return null;
@@ -56,6 +59,9 @@ export function AddonsPicker({
         {title}
       </h2>
       {hint && <p className="mt-1 text-[0.8rem] leading-6 text-taupe">{hint}</p>}
+      {discountPercent > 0 && (
+        <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-copper/10 px-3 py-1 text-[0.78rem] font-medium text-copper-deep">خصم {discountPercent}% على الإضافات مع هذا الطقم</p>
+      )}
       <ul className="mt-4 space-y-2.5">
         {addons.map((a) => {
           const c = choices[a.id];
@@ -83,7 +89,10 @@ export function AddonsPicker({
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-[0.9rem] text-espresso">{a.name}</span>
-                    <span className="mt-0.5 block text-[0.82rem] font-medium tabular-nums text-umber">+ {money(price)}</span>
+                    <span className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-[0.82rem] font-medium tabular-nums text-umber">
+                      + {money(discountPercent > 0 ? price - Math.round((price * discountPercent) / 100) : price)}
+                      {discountPercent > 0 && <s className="text-[0.75rem] font-normal text-mist">{money(price)}</s>}
+                    </span>
                   </span>
                 </button>
                 <Link href={`/product/${a.slug}`} target="_blank" className="shrink-0 text-xs text-taupe underline-offset-4 hover:text-espresso hover:underline">

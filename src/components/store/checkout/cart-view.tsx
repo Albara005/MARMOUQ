@@ -9,7 +9,7 @@ import { useMoney } from "@/components/store/store-provider";
 import { useCart, type CartLine } from "@/components/store/cart/cart-provider";
 import { QuantityStepper } from "@/components/store/quantity-stepper";
 import { ProductCard } from "@/components/store/product-card";
-import { computeTotals, type LookRule, type Totals } from "@/lib/pricing";
+import { addonRulesFrom, computeTotals, type LookRule, type Totals } from "@/lib/pricing";
 import type { ProductCardData } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
 import { useLookRules } from "./use-look-rules";
@@ -41,7 +41,7 @@ export function CartView({ suggestions }: { suggestions: ProductCardData[] }) {
   const money = useMoney();
   const lookIds = useMemo(() => cart.lines.map((l) => l.lookId), [cart.lines]);
   const { rules, loading } = useLookRules(lookIds);
-  const totals = useMemo(() => computeTotals({ lines: cart.lines, looks: rules }), [cart.lines, rules]);
+  const totals = useMemo(() => computeTotals({ lines: cart.lines, looks: rules, addons: addonRulesFrom(cart.lines) }), [cart.lines, rules]);
   const groups = useMemo(() => groupLines(cart.lines), [cart.lines]);
 
   const inCart = new Set(cart.lines.map((l) => l.productId));
@@ -51,7 +51,7 @@ export function CartView({ suggestions }: { suggestions: ProductCardData[] }) {
   if (cart.lines.length === 0) return <EmptyCart suggestions={suggestions} />;
 
   const hasLookGroups = groups.some((g) => g.lookId);
-  const estimate = totals.subtotal - totals.lookDiscount;
+  const estimate = totals.subtotal - totals.lookDiscount - totals.addonDiscount;
 
   return (
     <>
@@ -119,6 +119,7 @@ export function CartView({ suggestions }: { suggestions: ProductCardData[] }) {
                 <dl>
                   <SummaryRow label="المجموع الفرعي" value={money(totals.subtotal)} />
                   {totals.lookDiscount > 0 && <SummaryRow label="خصم الإطلالة الكاملة" value={`− ${money(totals.lookDiscount)}`} tone="saving" />}
+                  {totals.addonDiscount > 0 && <SummaryRow label="خصم الإضافات مع الطقم" value={`− ${money(totals.addonDiscount)}`} tone="saving" />}
                   <SummaryRow label="التوصيل" value="تُحسب عند الإتمام" tone="muted" />
                   <SummaryRow label="كود الخصم" value="يُضاف في الخطوة التالية" tone="muted" />
                 </dl>
@@ -275,6 +276,12 @@ function CartRow({ line: l, discount }: { line: CartLine; discount: number }) {
           {l.color && l.size && <span className="h-3 w-px bg-line" aria-hidden />}
           {l.size && <span>المقاس {l.size}</span>}
         </p>
+        {!l.lookId && l.addonOf && (
+          <p className="mt-1.5 inline-flex w-fit rounded-full bg-bone px-2.5 py-0.5 text-[0.7rem] font-medium text-umber">
+            {l.addonOfName ? `إضافة مع ${l.addonOfName}` : "إضافة"}
+            {l.addonDiscountPercent ? ` · خصم ${l.addonDiscountPercent}%` : ""}
+          </p>
+        )}
         <p className="mt-1.5 text-xs text-taupe">
           <span className="tabular-nums">{money(l.unitPrice)}</span> للقطعة
           {l.compareAtPrice != null && l.compareAtPrice > l.unitPrice && <s className="ms-2 tabular-nums text-mist">{money(l.compareAtPrice)}</s>}

@@ -75,6 +75,7 @@ const payloadSchema = z
       .max(ADDON_LIMIT, `${ADDON_LIMIT} إضافات كحد أقصى`)
       .transform((ids) => [...new Set(ids)])
       .catch([]),
+    addonDiscount: z.number({ message: "أدخل نسبة" }).int("نسبة صحيحة").min(0, "لا تقل عن صفر").max(90, "90% كحد أقصى"),
     price: money("السعر").min(1, "حدّد سعر البيع"),
     compareAtPrice: money("سعر المقارنة").nullable(),
     status: z.enum(["active", "draft", "archived"]),
@@ -222,6 +223,7 @@ export async function saveProductAction(input: unknown): Promise<ActionResult> {
         sizeGuide: v.sizeGuide,
         setParts: v.setParts,
         addonIds: v.addonIds.filter((id) => id !== v.id),
+        addonDiscount: v.addonDiscount,
         sortOrder: v.sortOrder,
         updatedAt: new Date(),
       };
@@ -359,6 +361,7 @@ export async function duplicateProductAction(id: number): Promise<ActionResult> 
           sizeGuide: src.sizeGuide,
           setParts: src.setParts,
           addonIds: src.addonIds,
+          addonDiscount: src.addonDiscount,
           sortOrder: src.sortOrder,
         })
         .returning({ id: products.id });

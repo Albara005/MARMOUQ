@@ -51,6 +51,8 @@ export type ProductEditorData = {
   setParts: SetPart[] | null;
   /** Add-on products offered on this product's page (watch, shoes…) */
   addonIds: number[];
+  /** % off each add-on bought with this product */
+  addonDiscount: number;
   variants: EditorVariant[];
   /** Variants that appear on past orders (cannot be hard-deleted) */
   orderedVariantIds: number[];
@@ -82,6 +84,7 @@ export type ProductPayload = {
   images: { id: string; color: string }[];
   setParts: SetPart[] | null;
   addonIds: number[];
+  addonDiscount: number;
   variants: EditorVariant[];
 };
 

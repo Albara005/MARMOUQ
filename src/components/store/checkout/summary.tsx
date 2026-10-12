@@ -120,6 +120,8 @@ export function SummaryItems({ lines, lineDiscounts, className }: { lines: CartL
                   <Sparkles className="size-3" aria-hidden />
                   {lookLabel(l.lookTitle)}
                 </p>
+              ) : l.addonOf ? (
+                <p className="mt-1 text-[0.7rem] text-umber">{l.addonOfName ? `إضافة مع ${l.addonOfName}` : "إضافة"}</p>
               ) : null}
             </div>
             <div className="shrink-0 text-end text-[0.88rem] tabular-nums">

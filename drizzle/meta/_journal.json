@@ -36,6 +36,13 @@
       "when": 1791804001692,
       "tag": "0004_product_addons",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791821614905,
+      "tag": "0005_product_addon_discount",
+      "breakpoints": true
     }
   ]
 }

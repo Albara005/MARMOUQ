@@ -87,6 +87,8 @@ export const products = pgTable(
     setParts: jsonb("set_parts").$type<{ label: string; guide: string; sizes: string[] }[] | null>(),
     /** Products offered as add-ons on this product's page (watch, shoes…), in display order */
     addonIds: jsonb("addon_ids").$type<number[]>().notNull().default([]),
+    /** % off each add-on bought together with this product (0 = none) */
+    addonDiscount: integer("addon_discount").notNull().default(0),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

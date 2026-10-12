@@ -45,6 +45,9 @@ export default async function InvoicePage({ params, searchParams }: Props) {
   if (!order) notFound();
 
   const money = (n: number) => formatMoney(n, settings.currency);
+  // the currency the customer saw at checkout (snapshot with its rate), when it differs from the base
+  const customerCurrency = order.displayCurrency && order.displayCurrency.code !== settings.currency.code ? order.displayCurrency : null;
+  const hasShipment = !!(order.carrierName || order.trackingNumber);
   const lineDiscounts = order.items.reduce((s, i) => s + i.lineDiscount, 0);
   const couponDiscount = Math.max(0, order.discount - lineDiscounts);
   const ig = settings.instagram.match(/instagram\.com\/([A-Za-z0-9._]+)/i)?.[1];
@@ -122,6 +125,28 @@ export default async function InvoicePage({ params, searchParams }: Props) {
           </div>
         </section>
 
+        {hasShipment && (
+          <section className="flex flex-wrap items-center gap-x-8 gap-y-2 border-b border-line py-4 text-sm" aria-label="الشحن">
+            <p>
+              <span className="text-taupe">شركة الشحن: </span>
+              <span className="font-semibold">{order.carrierName || "—"}</span>
+            </p>
+            {order.trackingNumber && (
+              <p>
+                <span className="text-taupe">رقم التتبّع: </span>
+                <span className="font-mono font-semibold tabular-nums" dir="ltr">
+                  {order.trackingNumber}
+                </span>
+              </p>
+            )}
+            {order.trackingUrl && (
+              <p className="min-w-0 basis-full truncate text-xs text-umber" dir="ltr" style={{ textAlign: "right" }}>
+                {order.trackingUrl}
+              </p>
+            )}
+          </section>
+        )}
+
         {/* Items */}
         <table className="mt-6 w-full border-collapse text-sm">
           <thead>
@@ -147,7 +172,7 @@ export default async function InvoicePage({ params, searchParams }: Props) {
                   <p className="font-medium">{it.name}</p>
                   <p className="mt-0.5 text-xs text-taupe">
                     {[it.color && `اللون: ${it.color}`, it.size && `المقاس: ${it.size}`].filter(Boolean).join(" · ")}
-                    {it.lineDiscount > 0 && <span className="text-copper-deep"> · خصم الإطلالة −{money(it.lineDiscount)}</span>}
+                    {it.lineDiscount > 0 && <span className="text-copper-deep"> · خصم −{money(it.lineDiscount)}</span>}
                   </p>
                 </td>
                 <td className="py-3.5 text-center tabular-nums">{formatNumber(it.quantity)}</td>
@@ -167,7 +192,7 @@ export default async function InvoicePage({ params, searchParams }: Props) {
             </div>
             {lineDiscounts > 0 && (
               <div className="flex justify-between">
-                <dt className="text-taupe">خصم الإطلالات</dt>
+                <dt className="text-taupe">خصم الإطلالات والإضافات</dt>
                 <dd className="tabular-nums">−{money(lineDiscounts)}</dd>
               </div>
             )}
@@ -185,6 +210,12 @@ export default async function InvoicePage({ params, searchParams }: Props) {
               <dt className="font-semibold">الإجمالي</dt>
               <dd className="text-2xl font-semibold tabular-nums tracking-tight">{money(order.total)}</dd>
             </div>
+            {customerCurrency && (
+              <div className="flex items-baseline justify-between rounded-lg bg-bone/70 px-3 py-2">
+                <dt className="text-umber">{`بعملة العميل (${customerCurrency.code})`}</dt>
+                <dd className="text-lg font-semibold tabular-nums">{formatMoney(order.total, customerCurrency)}</dd>
+              </div>
+            )}
           </dl>
         </div>
 

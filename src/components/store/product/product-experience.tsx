@@ -96,7 +96,10 @@ export function ProductExperience({
   const [addonChoices, setAddonChoices] = useState<Record<number, AddonChoice>>({});
   const [addonMissing, setAddonMissing] = useState<number[]>([]);
   const chosenAddons = product.addons.filter((a) => addonChoices[a.id]?.on);
-  const addonsTotal = chosenAddons.reduce((sum, a) => sum + (resolveAddon(a, addonChoices[a.id])?.price ?? a.price), 0);
+  const addonOff = product.addonDiscount;
+  const addonPrice = (n: number) => (addonOff > 0 ? n - Math.round((n * addonOff) / 100) : n);
+  // the discount covers one add-on per unit of this product
+  const addonsTotal = chosenAddons.reduce((sum, a) => sum + addonPrice(resolveAddon(a, addonChoices[a.id])?.price ?? a.price), 0);
   const setAddon = (id: number, next: AddonChoice) => {
     setAddonChoices((prev) => ({ ...prev, [id]: next }));
     setAddonMissing((prev) => prev.filter((x) => x !== id));
@@ -233,6 +236,9 @@ export function ProductExperience({
         imageBlur: img?.blur,
         maxQuantity: v.stock,
         lookId: null,
+        addonOf: product.id,
+        addonOfName: product.name,
+        addonDiscountPercent: addonOff,
         quantity: 1,
       };
     });
@@ -518,6 +524,7 @@ export function ProductExperience({
               title={config.copy["product.addonsTitle"] ?? "أكمل إطلالتك"}
               hint={config.copy["product.addonsHint"] ?? ""}
               missing={addonMissing}
+              discountPercent={addonOff}
             />
             {chosenAddons.length > 0 && (
               <p className="mt-4 flex items-baseline justify-between text-sm text-umber" aria-live="polite">

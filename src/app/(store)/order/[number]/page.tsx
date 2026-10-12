@@ -250,7 +250,7 @@ function Receipt({ order, money }: { order: OrderView; money: (n: number) => str
       <div className="border-t border-dashed border-sand bg-bone/40 px-5 py-5 md:px-7">
         <dl className="space-y-2 text-[0.9rem]">
           <Row label="المجموع الفرعي" value={money(order.subtotal)} />
-          {lookSavings > 0 && <Row label="خصم الإطلالة الكاملة" value={`− ${money(lookSavings)}`} saving />}
+          {lookSavings > 0 && <Row label="خصم الإطلالات والإضافات" value={`− ${money(lookSavings)}`} saving />}
           {couponSavings > 0 && (
             <Row
               label={

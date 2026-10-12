@@ -8,7 +8,7 @@ import { lineKey } from "@/lib/pricing";
  * the server re-prices everything from the database at checkout.
  */
 export type CartLine = {
-  key: string; // `${variantId}:${lookId ?? 0}`
+  key: string; // lineKey(variantId, lookId, addonOf)
   variantId: number;
   productId: number;
   slug: string;
@@ -25,6 +25,11 @@ export type CartLine = {
   lookId: number | null;
   lookTitle?: string;
   lookDiscountPercent?: number;
+  /** Added as an add-on of this product (watch with a suit…) */
+  addonOf?: number | null;
+  addonOfName?: string;
+  /** % off while the product it was added with is in the cart (server re-checks) */
+  addonDiscountPercent?: number;
 };
 
 export type NewCartLine = Omit<CartLine, "key" | "quantity"> & { quantity?: number };
@@ -53,7 +58,7 @@ const STORAGE_KEY = "marmouq.cart.v1";
 const MAX_QTY = 20;
 
 function mergeLine(lines: CartLine[], incoming: NewCartLine): CartLine[] {
-  const key = lineKey(incoming.variantId, incoming.lookId);
+  const key = lineKey(incoming.variantId, incoming.lookId, incoming.addonOf);
   const qty = Math.max(1, incoming.quantity ?? 1);
   const cap = Math.max(1, Math.min(MAX_QTY, incoming.maxQuantity || MAX_QTY));
   const idx = lines.findIndex((l) => l.key === key);

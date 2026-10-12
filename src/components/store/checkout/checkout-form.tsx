@@ -23,7 +23,7 @@ import { InstagramIcon, WhatsAppIcon } from "@/components/ui/brand-icons";
 import { useMoney, useStoreConfig } from "@/components/store/store-provider";
 import { useCart } from "@/components/store/cart/cart-provider";
 import { applyCoupon, submitOrder } from "@/app/(store)/checkout/actions";
-import { computeTotals, type CouponRule, type Totals } from "@/lib/pricing";
+import { addonRulesFrom, computeTotals, type CouponRule, type Totals } from "@/lib/pricing";
 import type { ShippingZoneData } from "@/lib/catalog";
 import type { PaymentAccount } from "@/lib/settings";
 import { cn, whatsappLink } from "@/lib/utils";
@@ -95,6 +95,7 @@ export function CheckoutForm({ zones, payments }: { zones: ShippingZoneData[]; p
       computeTotals({
         lines: cart.lines,
         looks: rules,
+        addons: addonRulesFrom(cart.lines),
         coupon,
         shippingFee: zone?.fee ?? 0,
         freeShippingThreshold: config.freeShippingThreshold,
@@ -181,7 +182,7 @@ export function CheckoutForm({ zones, payments }: { zones: ShippingZoneData[]; p
           paymentMethod: method,
           couponCode: coupon && !couponBlocked ? coupon.code : "",
           currencyCode: config.currency.code,
-          lines: cart.lines.map((l) => ({ variantId: l.variantId, quantity: l.quantity, lookId: l.lookId ?? null })),
+          lines: cart.lines.map((l) => ({ variantId: l.variantId, quantity: l.quantity, lookId: l.lookId ?? null, addonOf: l.addonOf ?? null })),
         });
         if (res.ok) {
           setPlaced(true);
@@ -269,6 +270,7 @@ export function CheckoutForm({ zones, payments }: { zones: ShippingZoneData[]; p
       <dl>
         <SummaryRow label={`المجموع الفرعي · ${piecesLabel(cart.count)}`} value={money(totals.subtotal)} />
         {totals.lookDiscount > 0 && <SummaryRow label="خصم الإطلالة الكاملة" value={`− ${money(totals.lookDiscount)}`} tone="saving" />}
+        {totals.addonDiscount > 0 && <SummaryRow label="خصم الإضافات مع الطقم" value={`− ${money(totals.addonDiscount)}`} tone="saving" />}
         {coupon && !couponBlocked && totals.couponDiscount > 0 && (
           <SummaryRow
             label={

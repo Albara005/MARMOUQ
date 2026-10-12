@@ -167,6 +167,7 @@ export function ProductEditor({ initial, categories, currencySymbol, sizeGuides 
       images: d.images.map((i) => ({ id: i.id, color: i.color })),
       setParts: isSetProduct(d.setParts) ? d.setParts.map((x) => ({ label: x.label.trim(), guide: x.guide, sizes: x.sizes })) : null,
       addonIds: d.addonIds,
+      addonDiscount: Number(d.addonDiscount) || 0,
       variants: d.variants.map((v) => ({ ...v, stock: Number(v.stock) || 0, priceOverride: v.priceOverride ? Number(v.priceOverride) : null })),
     };
     start(async () => {
@@ -512,6 +513,30 @@ export function ProductEditor({ initial, categories, currencySymbol, sizeGuides 
 
           <Card title="إضافات مع المنتج" description="قطع يقدر العميل يضيفها مع هذا المنتج من نفس الصفحة — مثل ساعة أو جوتي مع الطقم.">
             <AddonsPicker value={d.addonIds} options={addonOptions} money={money} onChange={(ids) => set("addonIds", ids)} />
+            {d.addonIds.length > 0 && (
+              <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl bg-ivory px-3.5 py-3">
+                <label htmlFor="addonDiscount" className="text-sm text-umber">
+                  خصم على الإضافات إذا انطلبت مع هذا المنتج
+                </label>
+                <div className="relative w-28">
+                  <Input
+                    id="addonDiscount"
+                    type="number"
+                    min={0}
+                    max={90}
+                    inputMode="numeric"
+                    value={d.addonDiscount || ""}
+                    placeholder="0"
+                    onChange={(e) => set("addonDiscount", Math.min(90, Math.max(0, Math.round(Number(e.target.value) || 0))))}
+                    className="h-10 pe-8 tabular-nums"
+                    aria-invalid={!!err("addonDiscount")}
+                  />
+                  <span className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-sm text-taupe">%</span>
+                </div>
+                <span className="text-xs text-taupe">{d.addonDiscount > 0 ? `مثلاً: ساعة بـ ${money(20000)} تصير ${money(Math.round(20000 * (1 - d.addonDiscount / 100)))} مع الطقم` : "اتركه 0 بدون خصم"}</span>
+                {err("addonDiscount") && <p className="w-full text-xs text-danger">{err("addonDiscount")}</p>}
+              </div>
+            )}
           </Card>
         </div>
 

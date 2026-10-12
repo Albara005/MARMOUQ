@@ -55,6 +55,8 @@ export type ProductDetail = ProductCardData & {
   variants: VariantData[];
   /** Pieces offered with this product (watch, shoes…), in the merchant's order */
   addons: AddonProduct[];
+  /** % off each add-on bought together with this product */
+  addonDiscount: number;
 };
 
 /** An add-on offered on a product page, with its purchasable options. */
@@ -242,6 +244,7 @@ export const getProductBySlug = cache(async (slug: string): Promise<ProductDetai
       care: products.care,
       sizeGuide: products.sizeGuide,
       addonIds: products.addonIds,
+      addonDiscount: products.addonDiscount,
     })
     .from(products)
     .leftJoin(categories, eq(categories.id, products.categoryId))
@@ -268,6 +271,7 @@ export const getProductBySlug = cache(async (slug: string): Promise<ProductDetai
     sizeGuide: r.sizeGuide,
     variants: vars.map((v) => ({ id: v.id, color: v.color, colorHex: v.colorHex, size: v.size, stock: v.stock, price: v.priceOverride ?? r.price })),
     addons,
+    addonDiscount: addons.length ? Math.min(90, Math.max(0, r.addonDiscount)) : 0,
   };
 });
 

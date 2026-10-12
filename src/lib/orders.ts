@@ -17,7 +17,7 @@ import {
   type OrderStatus,
   type PaymentStatus,
 } from "@/db/schema";
-import { computeTotals, lineKey, type CouponRule, type LookRule } from "@/lib/pricing";
+import { computeTotals, lineKey, type AddonRule, type CouponRule, type LookRule } from "@/lib/pricing";
 import { getSettings, resolveDisplayCurrency } from "@/lib/settings";
 import { normalizePhone, randomToken } from "@/lib/utils";
 import { formatMoney, isForeign } from "@/lib/money";
@@ -47,6 +47,8 @@ export const checkoutSchema = z.object({
         variantId: z.coerce.number().int().positive(),
         quantity: z.coerce.number().int().min(1).max(20),
         lookId: z.coerce.number().int().positive().nullable().optional(),
+        /** product this line was added with as an add-on (discount re-checked against the catalogue) */
+        addonOf: z.coerce.number().int().positive().nullable().optional(),
       }),
     )
     .min(1, "السلة فارغة")
@@ -100,12 +102,13 @@ export async function placeOrder(raw: unknown): Promise<PlaceOrderResult> {
   if (input.paymentMethod === "cod" && !settings.payments.cod.enabled) return { ok: false, error: "طريقة الدفع غير متاحة" };
   if (input.paymentMethod === "transfer" && !settings.payments.transfer.enabled) return { ok: false, error: "طريقة الدفع غير متاحة" };
 
-  // Merge duplicate lines (same variant + look)
-  const merged = new Map<string, { variantId: number; quantity: number; lookId: number | null }>();
+  // Merge duplicate lines (same variant + look + add-on parent)
+  const merged = new Map<string, { variantId: number; quantity: number; lookId: number | null; addonOf: number | null }>();
   for (const l of input.lines) {
-    const k = lineKey(l.variantId, l.lookId ?? null);
+    const addonOf = l.lookId ? null : (l.addonOf ?? null);
+    const k = lineKey(l.variantId, l.lookId ?? null, addonOf);
     const prev = merged.get(k);
-    merged.set(k, { variantId: l.variantId, lookId: l.lookId ?? null, quantity: Math.min(20, (prev?.quantity ?? 0) + l.quantity) });
+    merged.set(k, { variantId: l.variantId, lookId: l.lookId ?? null, addonOf, quantity: Math.min(20, (prev?.quantity ?? 0) + l.quantity) });
   }
   const lines = [...merged.values()];
 
@@ -154,6 +157,19 @@ export async function placeOrder(raw: unknown): Promise<PlaceOrderResult> {
         lookRules = lr.map((l) => ({ id: l.id, discountPercent: l.discountPercent, productIds: li.filter((i) => i.lookId === l.id).map((i) => i.productId) }));
       }
 
+      // Add-on discounts come from the catalogue, never from the browser
+      const parentIds = [...new Set(lines.map((l) => l.addonOf).filter((x): x is number => !!x))];
+      let addonRules: AddonRule[] = [];
+      if (parentIds.length) {
+        const parents = await tx
+          .select({ id: products.id, addonIds: products.addonIds, addonDiscount: products.addonDiscount })
+          .from(products)
+          .where(and(inArray(products.id, parentIds), eq(products.status, "active")));
+        addonRules = parents
+          .filter((p) => p.addonDiscount > 0 && Array.isArray(p.addonIds) && p.addonIds.length)
+          .map((p) => ({ parentId: p.id, productIds: p.addonIds, discountPercent: p.addonDiscount }));
+      }
+
       let couponRow: (CouponRule & { id: number }) | null = null;
       if (input.couponCode) {
         const found = await findValidCoupon(input.couponCode);
@@ -163,11 +179,12 @@ export async function placeOrder(raw: unknown): Promise<PlaceOrderResult> {
 
       const pricingLines = lines.map((l) => {
         const v = byId.get(l.variantId)!;
-        return { variantId: v.id, productId: v.productId, unitPrice: v.priceOverride ?? v.productPrice, quantity: l.quantity, lookId: l.lookId };
+        return { variantId: v.id, productId: v.productId, unitPrice: v.priceOverride ?? v.productPrice, quantity: l.quantity, lookId: l.lookId, addonOf: l.addonOf };
       });
       const totals = computeTotals({
         lines: pricingLines,
         looks: lookRules,
+        addons: addonRules,
         coupon: couponRow,
         shippingFee: zone.fee,
         freeShippingThreshold: settings.freeShippingThreshold,
@@ -232,7 +249,7 @@ export async function placeOrder(raw: unknown): Promise<PlaceOrderResult> {
             imageId: img?.mediaId ?? null,
             unitPrice: v.priceOverride ?? v.productPrice,
             quantity: l.quantity,
-            lineDiscount: totals.lineDiscounts[lineKey(v.id, l.lookId)] ?? 0,
+            lineDiscount: totals.lineDiscounts[lineKey(v.id, l.lookId, l.addonOf)] ?? 0,
           };
         }),
       );

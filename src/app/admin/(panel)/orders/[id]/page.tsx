@@ -185,7 +185,7 @@ export default async function OrderDetailPage({ params }: Props) {
                           {it.color && <span>اللون: <span className="text-umber">{it.color}</span></span>}
                           {it.size && <span>المقاس: <span className="text-umber" dir="ltr">{it.size}</span></span>}
                         </p>
-                        {it.lineDiscount > 0 && <p className="mt-1 text-xs text-copper-deep">خصم الإطلالة −{money(it.lineDiscount)}</p>}
+                        {it.lineDiscount > 0 && <p className="mt-1 text-xs text-copper-deep">خصم −{money(it.lineDiscount)}</p>}
                       </div>
                       <div className="flex items-baseline justify-between gap-4 sm:block sm:text-end">
                         <p className="text-xs tabular-nums text-taupe">
@@ -205,7 +205,7 @@ export default async function OrderDetailPage({ params }: Props) {
               </div>
               {lineDiscounts > 0 && (
                 <div className="flex justify-between gap-4">
-                  <dt className="text-taupe">خصم الإطلالات</dt>
+                  <dt className="text-taupe">خصم الإطلالات والإضافات</dt>
                   <dd className="tabular-nums text-copper-deep">−{money(lineDiscounts)}</dd>
                 </div>
               )}
