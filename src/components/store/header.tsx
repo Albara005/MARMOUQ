@@ -180,8 +180,12 @@ export function Header({ categories }: { categories: NavCategory[] }) {
 
           {/* Centre: wordmark */}
           <Link href="/" className="justify-self-center rounded-sm px-2 py-1" aria-label="مرموق — الصفحة الرئيسية">
-            <Wordmark tone={light ? "light" : "dark"} size="sm" className="transition-colors duration-500 lg:hidden" />
-            <Wordmark tone={light ? "light" : "dark"} size="md" className="hidden transition-colors duration-500 lg:inline-flex" />
+            <span className="block lg:hidden">
+              <Wordmark tone={light ? "light" : "dark"} size="sm" className="transition-colors duration-500" />
+            </span>
+            <span className="hidden lg:block">
+              <Wordmark tone={light ? "light" : "dark"} size="md" className="transition-colors duration-500" />
+            </span>
           </Link>
 
           {/* End: utilities */}

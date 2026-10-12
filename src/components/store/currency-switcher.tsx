@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { ChevronDown } from "lucide-react";
 import { useStoreConfig } from "@/components/store/store-provider";
-import { cn } from "@/lib/utils";
+import { baseDisplay, cn } from "@/lib/utils";
 
 const COOKIE = "mrq_cur";
 
@@ -22,7 +22,7 @@ export function CurrencySwitcher({ className, tone = "dark", variant = "compact"
   };
 
   return (
-    <label className={cn("relative inline-flex items-center", pending && "opacity-60", className)}>
+    <label className={cn(baseDisplay("relative inline-flex items-center", className), pending && "opacity-60", className)}>
       <span className="sr-only">العملة</span>
       <select
         value={config.currency.code}

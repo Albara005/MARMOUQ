@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LoaderCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { baseDisplay, cn } from "@/lib/utils";
 
 export type ButtonVariant = "primary" | "copper" | "outline" | "ghost" | "light" | "danger" | "link";
 export type ButtonSize = "sm" | "md" | "lg" | "icon";
@@ -26,7 +26,7 @@ const sizes: Record<ButtonSize, string> = {
 };
 
 export function buttonClasses(variant: ButtonVariant = "primary", size: ButtonSize = "md", className?: string) {
-  return cn(base, variants[variant], variant === "link" ? "" : sizes[size], className);
+  return cn(baseDisplay(base, className), variants[variant], variant === "link" ? "" : sizes[size], className);
 }
 
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {

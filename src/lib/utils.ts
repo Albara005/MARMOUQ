@@ -3,6 +3,18 @@ export function cn(...parts: Array<string | false | null | undefined | 0>): stri
   return parts.filter(Boolean).join(" ");
 }
 
+/**
+ * When a caller hides a component (`hidden lg:inline-flex`), drop the component's own base
+ * display utility so it cannot override `hidden` (Tailwind gives both equal specificity).
+ */
+export function baseDisplay(base: string, extra?: string | null): string {
+  if (!extra || !/(^|\s)hidden(\s|$)/.test(extra)) return base;
+  return base
+    .split(/\s+/)
+    .filter((c) => !/^(inline-flex|flex|block|inline-block|grid|inline-grid)$/.test(c))
+    .join(" ");
+}
+
 /** URL-safe slug that keeps Arabic letters readable. */
 export function slugify(input: string): string {
   return input
