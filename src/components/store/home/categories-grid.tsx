@@ -19,7 +19,15 @@ function pieces(n: number) {
  * Asymmetric editorial grid: the first category is a tall feature tile,
  * the rest sit in a 2×2 block beside it (desktop) / a 2-column grid (mobile).
  */
-export function CategoriesGrid({ categories, fallbacks }: { categories: CategoryData[]; fallbacks: Record<string, MediaRef | null> }) {
+export function CategoriesGrid({
+  categories,
+  fallbacks,
+  copy = { eyebrow: "The Wardrobe", title: "خزانة الرجل المرموق", subtitle: "" },
+}: {
+  categories: CategoryData[];
+  fallbacks: Record<string, MediaRef | null>;
+  copy?: { eyebrow: string; title: string; subtitle: string };
+}) {
   const list = categories.filter((c) => c.productCount > 0 || c.image).slice(0, 5);
   if (list.length === 0) return null;
   const count = list.length;
@@ -30,9 +38,9 @@ export function CategoriesGrid({ categories, fallbacks }: { categories: Category
         <div data-reveal>
           <SectionHeading
             id="cats-title"
-            eyebrow="The Wardrobe"
-            title="خزانة الرجل المرموق"
-            subtitle="من التريكو الإيطالي إلى الشوز المصنوع يدوياً — كل قسم منتقى ليكمل الآخر."
+            eyebrow={copy.eyebrow}
+            title={copy.title}
+            subtitle={copy.subtitle || undefined}
             action={{ label: "تسوّق كل القطع", href: "/shop" }}
           />
         </div>

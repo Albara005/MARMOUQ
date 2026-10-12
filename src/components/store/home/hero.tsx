@@ -12,7 +12,17 @@ export function HomeHero({
   subtitle,
   ctaLabel,
   ctaHref,
+  mobileMedia = null,
+  overlay = 45,
+  secondaryLabel = "نسّق إطلالتك",
+  secondaryHref = "/atelier",
+  sideText = "Est. Yemen — Italian Craft",
 }: {
+  mobileMedia?: MediaRef | null;
+  overlay?: number;
+  secondaryLabel?: string;
+  secondaryHref?: string;
+  sideText?: string;
   media: MediaRef | null;
   eyebrow: string;
   title: string;
@@ -31,12 +41,18 @@ export function HomeHero({
       `}</style>
 
       {media && (
-        <div className="absolute inset-0 -z-10">
+        <div className={mobileMedia ? "absolute inset-0 -z-10 hidden md:block" : "absolute inset-0 -z-10"}>
           <MediaImage media={media} priority sizes="100vw" className="h-full w-full" imgClassName="animate-slow-zoom object-[50%_40%]" alt={media.alt || title.replace(/\n/g, " ")} />
         </div>
       )}
-      {/* Legibility: deep floor + a darker reading side (start = right) */}
-      <div className="absolute inset-0 -z-10 bg-gradient-to-t from-espresso via-espresso/40 to-espresso/55" aria-hidden />
+      {mobileMedia && (
+        <div className="absolute inset-0 -z-10 md:hidden">
+          <MediaImage media={mobileMedia} priority sizes="100vw" className="h-full w-full" imgClassName="animate-slow-zoom object-center" alt={mobileMedia.alt || title.replace(/\n/g, " ")} />
+        </div>
+      )}
+      {/* Legibility: adjustable overlay + deep floor + a darker reading side (start = right) */}
+      <div className="absolute inset-0 -z-10 bg-espresso" style={{ opacity: Math.min(90, Math.max(0, overlay)) / 100 }} aria-hidden />
+      <div className="absolute inset-0 -z-10 bg-gradient-to-t from-espresso/90 via-transparent to-transparent" aria-hidden />
       <div className="absolute inset-0 -z-10 bg-gradient-to-l from-espresso/75 via-espresso/25 to-transparent" aria-hidden />
 
       <div className="container-luxe relative flex flex-1 flex-col justify-end pb-24 pt-36 md:pb-28 lg:pb-32">
@@ -57,24 +73,26 @@ export function HomeHero({
               {ctaLabel || "تسوّق المجموعة"}
               <ArrowLeft className="size-4 transition-transform duration-500 group-hover:-translate-x-1" aria-hidden />
             </Link>
-            <Link
-              href="/atelier"
-              className={buttonClasses("outline", "lg", "w-full border-paper/50 text-paper backdrop-blur-[2px] hover:border-paper hover:bg-paper hover:text-espresso sm:w-auto")}
-            >
-              نسّق إطلالتك
-            </Link>
+            {secondaryLabel && (
+              <Link
+                href={secondaryHref || "/atelier"}
+                className={buttonClasses("outline", "lg", "w-full border-paper/50 text-paper backdrop-blur-[2px] hover:border-paper hover:bg-paper hover:text-espresso sm:w-auto")}
+              >
+                {secondaryLabel}
+              </Link>
+            )}
           </div>
         </div>
       </div>
 
       {/* Vertical latin signature on the end (left) edge */}
-      <div className="pointer-events-none absolute inset-y-0 end-5 hidden items-center md:flex lg:end-9" aria-hidden>
+      {sideText && <div className="pointer-events-none absolute inset-y-0 end-5 hidden items-center md:flex lg:end-9" aria-hidden>
         <div className="flex rotate-180 items-center gap-4 [writing-mode:vertical-rl]">
           <span className="h-16 w-px bg-paper/30" />
-          <span className="font-[family-name:var(--font-latin)] text-[0.72rem] uppercase tracking-[0.5em] text-paper/60">Est. Yemen — Italian Craft</span>
+          <span className="font-[family-name:var(--font-latin)] text-[0.72rem] uppercase tracking-[0.5em] text-paper/60">{sideText}</span>
           <span className="h-16 w-px bg-paper/30" />
         </div>
-      </div>
+      </div>}
 
       {/* Scroll cue */}
       <a

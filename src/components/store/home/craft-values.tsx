@@ -23,18 +23,29 @@ const VALUES = [
   },
 ] as const;
 
-export function CraftValues() {
+export function CraftValues({
+  copy,
+}: {
+  copy?: { eyebrow: string; title: string; subtitle: string; items: { title: string; body: string }[] };
+}) {
+  const items = copy?.items?.length ? copy.items.map((it, i) => ({ ...it, en: VALUES[i]?.en ?? "" })) : VALUES;
   return (
     <section aria-labelledby="craft-title" className="bg-ivory py-20 md:py-28">
       <div className="container-luxe">
         <div data-reveal>
-          <SectionHeading id="craft-title" eyebrow="The Marmouq Standard" title="تفاصيل مختارة بعناية" align="center" subtitle="أربعة مبادئ نلتزم فيها بكل قطعة توصلك — لأن الأناقة الحقيقية في التفاصيل." />
+          <SectionHeading
+            id="craft-title"
+            eyebrow={copy?.eyebrow ?? "The Marmouq Standard"}
+            title={copy?.title ?? "تفاصيل مختارة بعناية"}
+            align="center"
+            subtitle={copy ? copy.subtitle || undefined : "أربعة مبادئ نلتزم فيها بكل قطعة توصلك — لأن الأناقة الحقيقية في التفاصيل."}
+          />
         </div>
         <div className="hairline mt-14 md:mt-20" aria-hidden />
         <ol className="grid sm:grid-cols-2 lg:grid-cols-4">
-          {VALUES.map((v, i) => (
+          {items.map((v, i) => (
             <li
-              key={v.title}
+              key={`${i}-${v.title}`}
               data-reveal
               style={{ "--reveal-delay": `${i * 110}ms` } as React.CSSProperties}
               className="group relative border-b border-line px-1 py-10 sm:px-6 sm:[&:nth-child(odd)]:border-e lg:border-b-0 lg:border-e lg:px-8 lg:py-14 lg:last:border-e-0 lg:first:ps-0"
@@ -43,7 +54,7 @@ export function CraftValues() {
                 {String(i + 1).padStart(2, "0")}
               </span>
               <h3 className="display mt-6 text-2xl text-espresso">{v.title}</h3>
-              <p className="eyebrow mt-1.5 text-[0.68rem] text-taupe">{v.en}</p>
+              {v.en && <p className="eyebrow mt-1.5 text-[0.68rem] text-taupe">{v.en}</p>}
               <p className="mt-4 max-w-xs text-[0.92rem] leading-7 text-umber">{v.body}</p>
             </li>
           ))}

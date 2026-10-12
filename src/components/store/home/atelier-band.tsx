@@ -6,7 +6,13 @@ import type { MediaRef } from "@/lib/catalog";
 export type AtelierSlot = { label: string; media: MediaRef | null };
 
 /** Closing band teasing the outfit builder: five slots adding up to one look. */
-export function AtelierBand({ slots }: { slots: AtelierSlot[] }) {
+export function AtelierBand({
+  slots,
+  copy = { eyebrow: "The Atelier", title: "نسّق إطلالتك بنفسك، قطعة بقطعة", text: "", ctaLabel: "ابدأ التنسيق الآن" },
+}: {
+  slots: AtelierSlot[];
+  copy?: { eyebrow: string; title: string; text: string; ctaLabel: string };
+}) {
   const list = slots.slice(0, 5);
   return (
     <section aria-labelledby="atelier-title" className="relative isolate overflow-hidden bg-espresso py-20 text-paper grain md:py-28">
@@ -19,15 +25,13 @@ export function AtelierBand({ slots }: { slots: AtelierSlot[] }) {
         <div data-reveal className="flex flex-col items-center">
           <p className="eyebrow inline-flex items-center gap-3 text-copper-soft">
             <span className="h-px w-6 bg-copper-soft/60" aria-hidden />
-            The Atelier
+            {copy.eyebrow}
             <span className="h-px w-6 bg-copper-soft/60" aria-hidden />
           </p>
           <h2 id="atelier-title" className="display mt-5 max-w-3xl text-[2.4rem] leading-[1.12] text-balance md:text-6xl">
-            نسّق إطلالتك بنفسك، قطعة بقطعة
+            {copy.title}
           </h2>
-          <p className="mt-5 max-w-xl text-[0.98rem] leading-8 text-paper/70">
-            اختر السويتر، القميص، الربطة، البنطال والشوز — وشوف إطلالتك تكتمل قدامك مع سعرها النهائي قبل ما تطلب.
-          </p>
+          {copy.text && <p className="mt-5 max-w-xl text-[0.98rem] leading-8 text-paper/70">{copy.text}</p>}
         </div>
 
         {list.length > 0 && (
@@ -51,7 +55,7 @@ export function AtelierBand({ slots }: { slots: AtelierSlot[] }) {
           className="group mt-12 inline-flex h-14 items-center gap-3 rounded-full bg-copper px-9 text-[0.95rem] font-medium text-paper transition-colors duration-300 hover:bg-copper-deep md:mt-14"
           data-reveal
         >
-          ابدأ التنسيق الآن
+          {copy.ctaLabel}
           <ArrowLeft className="size-4 transition-transform duration-500 group-hover:-translate-x-1" aria-hidden />
         </Link>
       </div>

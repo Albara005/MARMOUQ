@@ -20,7 +20,13 @@ export function explodeByColour(products: ProductCardData[], max = 8): Entry[] {
   return out;
 }
 
-export function NewArrivals({ products }: { products: ProductCardData[] }) {
+export function NewArrivals({
+  products,
+  copy = { eyebrow: "New Arrivals", title: "وصل حديثاً", subtitle: "" },
+}: {
+  products: ProductCardData[];
+  copy?: { eyebrow: string; title: string; subtitle: string };
+}) {
   const ordered = [...products].sort((a, b) => Number(b.isNew) - Number(a.isNew));
   const entries = explodeByColour(ordered, 8);
   if (entries.length === 0) return null;
@@ -31,9 +37,9 @@ export function NewArrivals({ products }: { products: ProductCardData[] }) {
         <div data-reveal>
           <SectionHeading
             id="arrivals-title"
-            eyebrow="New Arrivals"
-            title="وصل حديثاً"
-            subtitle="قطع الموسم بألوانها كاملة — اختر لونك وخلّ الباقي علينا."
+            eyebrow={copy.eyebrow}
+            title={copy.title}
+            subtitle={copy.subtitle || undefined}
             action={{ label: "عرض الكل", href: "/shop?sort=newest" }}
           />
         </div>

@@ -15,8 +15,8 @@ import { ListEditor } from "./list-editors";
 type TabId = "identity" | "home" | "bars" | "markets" | "payments" | "shipping" | "policies" | "seo";
 const TABS: { id: TabId; label: string; icon: typeof Store; prefixes: string[] }[] = [
   { id: "identity", label: "الهوية والتواصل", icon: Store, prefixes: ["storeName", "storeNameEn", "tagline", "description", "whatsapp", "phone", "email", "instagram", "tiktok", "address", "workingHours"] },
-  { id: "home", label: "الواجهة الرئيسية", icon: House, prefixes: ["hero", "testimonials"] },
-  { id: "bars", label: "الأشرطة والأقسام", icon: Megaphone, prefixes: ["bars", "announcements", "home"] },
+  { id: "home", label: "الواجهة الرئيسية", icon: House, prefixes: ["hero", "testimonials", "home"] },
+  { id: "bars", label: "الأشرطة الإعلانية", icon: Megaphone, prefixes: ["bars", "announcements"] },
   { id: "markets", label: "العملات والأسواق", icon: Coins, prefixes: ["markets"] },
   { id: "payments", label: "المدفوعات", icon: CreditCard, prefixes: ["payments"] },
   { id: "shipping", label: "الشحن والعملة", icon: Truck, prefixes: ["currency", "freeShippingThreshold", "lowStockThreshold"] },
@@ -60,15 +60,30 @@ function Section({ title, description, children, aside }: { title: string; descr
 
 const inputSm = "h-11";
 
-export function SettingsForm({ initial, heroMedia, initialTab }: { initial: StoreSettings; heroMedia: MediaLike | null; initialTab: string }) {
+export function SettingsForm({
+  initial,
+  heroMedia,
+  mobileHeroMedia = null,
+  productOptions = [],
+  lookOptions = [],
+  initialTab,
+}: {
+  initial: StoreSettings;
+  heroMedia: MediaLike | null;
+  mobileHeroMedia?: MediaLike | null;
+  productOptions?: { slug: string; name: string }[];
+  lookOptions?: { slug: string; title: string }[];
+  initialTab: string;
+}) {
   const [s, setS] = useState<StoreSettings>(initial);
   const [saved, setSaved] = useState(() => JSON.stringify(initial));
   const [hero, setHero] = useState<MediaLike[]>(heroMedia ? [heroMedia] : []);
+  const [mobileHero, setMobileHero] = useState<MediaLike[]>(mobileHeroMedia ? [mobileHeroMedia] : []);
   const [tab, setTab] = useState<TabId>(TABS.some((t) => t.id === initialTab) ? (initialTab as TabId) : "identity");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const topRef = useRef<HTMLDivElement>(null);
 
-  const payload = useMemo(() => ({ ...s, hero: { ...s.hero, mediaId: hero[0]?.id ?? null } }), [s, hero]);
+  const payload = useMemo(() => ({ ...s, hero: { ...s.hero, mediaId: hero[0]?.id ?? null, mobileMediaId: mobileHero[0]?.id ?? null } }), [s, hero, mobileHero]);
   const json = JSON.stringify(payload);
   const dirty = json !== saved;
 
@@ -82,6 +97,25 @@ export function SettingsForm({ initial, heroMedia, initialTab }: { initial: Stor
 
   const set = <K extends keyof StoreSettings>(k: K, v: StoreSettings[K]) => setS((p) => ({ ...p, [k]: v }));
   const setIn = <K extends "hero" | "currency" | "policies" | "seo">(k: K, patch: Partial<StoreSettings[K]>) => setS((p) => ({ ...p, [k]: { ...p[k], ...patch } }));
+  const setHome = <K extends Exclude<keyof StoreSettings["home"], "sections">>(k: K, patch: Partial<StoreSettings["home"][K]>) =>
+    setS((p) => ({ ...p, home: { ...p.home, [k]: { ...p.home[k], ...patch } } }));
+  const toggleSection = (k: HomeSectionKey, on: boolean) => setS((p) => ({ ...p, home: { ...p.home, sections: { ...p.home.sections, [k]: on } } }));
+  const sectionSwitch = (k: HomeSectionKey) => <Switch checked={s.home.sections[k]} onChange={(e) => toggleSection(k, e.target.checked)} label="ظاهر" />;
+  const copyFields = (k: "categories" | "newArrivals" | "craft", hasSubtitle = true) => (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <F label="العنوان الصغير (فوق العنوان)" name={`home.${k}.eyebrow`}>
+        <Input id={`s-home.${k}.eyebrow`} className={inputSm} value={s.home[k].eyebrow} onChange={(e) => setHome(k, { eyebrow: e.target.value })} />
+      </F>
+      <F label="العنوان" name={`home.${k}.title`}>
+        <Input id={`s-home.${k}.title`} className={inputSm} value={s.home[k].title} onChange={(e) => setHome(k, { title: e.target.value })} />
+      </F>
+      {hasSubtitle && (
+        <F label="الوصف" name={`home.${k}.subtitle`} className="sm:col-span-2">
+          <Textarea id={`s-home.${k}.subtitle`} rows={2} value={s.home[k].subtitle} onChange={(e) => setHome(k, { subtitle: e.target.value })} />
+        </F>
+      )}
+    </div>
+  );
   const setBar = <K extends "announcement" | "marquee">(k: K, patch: Partial<StoreSettings["bars"][K]>) =>
     setS((p) => ({ ...p, bars: { ...p.bars, [k]: { ...p.bars[k], ...patch } } }));
   const setPay = (k: "cod" | "transfer", patch: Partial<StoreSettings["payments"]["transfer"]>) =>
@@ -98,7 +132,7 @@ export function SettingsForm({ initial, heroMedia, initialTab }: { initial: Stor
         if (r.ok) {
           const next = (r.data?.settings as StoreSettings | undefined) ?? payload;
           setS(next);
-          setSaved(JSON.stringify({ ...next, hero: { ...next.hero, mediaId: hero[0]?.id ?? null } }));
+          setSaved(JSON.stringify({ ...next, hero: { ...next.hero, mediaId: hero[0]?.id ?? null, mobileMediaId: mobileHero[0]?.id ?? null } }));
           setErrors({});
         } else {
           const fe = r.fieldErrors ?? {};
@@ -251,6 +285,154 @@ export function SettingsForm({ initial, heroMedia, initialTab }: { initial: Stor
                   alt={s.hero.title.replace(/\n/g, " ")}
                 />
                 <ActionFieldError name="hero.mediaId" />
+              </div>
+              <div className="mt-6 grid gap-5 border-t border-line pt-5 md:grid-cols-2">
+                <div>
+                  <ImageUploader
+                    value={mobileHero}
+                    onChange={setMobileHero}
+                    multiple={false}
+                    label="صورة خاصة بالجوال (اختيارية)"
+                    hint="صورة عمودية تظهر على شاشات الجوال بدلاً من الصورة الرئيسية."
+                    alt={s.hero.title.replace(/\n/g, " ")}
+                  />
+                  <ActionFieldError name="hero.mobileMediaId" />
+                </div>
+                <div className="space-y-4">
+                  <F label={`تعتيم الصورة: ${s.hero.overlay}%`} name="hero.overlay" hint="زِده إذا كان النص غير واضح فوق الصورة.">
+                    <input
+                      id="s-hero.overlay"
+                      type="range"
+                      min={0}
+                      max={90}
+                      step={5}
+                      value={s.hero.overlay}
+                      onChange={(e) => setIn("hero", { overlay: Number(e.target.value) })}
+                      className="w-full accent-copper"
+                    />
+                  </F>
+                  <div className="grid grid-cols-2 gap-3">
+                    <F label="الزر الثاني" name="hero.secondaryLabel" hint="اتركه فارغاً لإخفائه">
+                      <Input id="s-hero.secondaryLabel" className={inputSm} value={s.hero.secondaryLabel} onChange={(e) => setIn("hero", { secondaryLabel: e.target.value })} />
+                    </F>
+                    <F label="رابطه" name="hero.secondaryHref">
+                      <Input id="s-hero.secondaryHref" dir="ltr" className={inputSm} value={s.hero.secondaryHref} onChange={(e) => setIn("hero", { secondaryHref: e.target.value })} style={{ textAlign: "right" }} />
+                    </F>
+                  </div>
+                  <F label="النص الجانبي (للكمبيوتر)" name="hero.sideText" hint="اتركه فارغاً لإخفائه">
+                    <Input id="s-hero.sideText" dir="ltr" className={inputSm} value={s.hero.sideText} onChange={(e) => setIn("hero", { sideText: e.target.value })} style={{ textAlign: "right" }} />
+                  </F>
+                </div>
+              </div>
+            </Section>
+
+            <Section title="شبكة الأقسام" description="صور الأقسام نفسها تُغيَّر من صفحة «التصنيفات»." aside={sectionSwitch("categories")}>
+              {copyFields("categories")}
+            </Section>
+
+            <Section title="قصة الألوان" description="قسم تفاعلي يغيّر لون الخلفية مع كل لون للمنتج المختار." aside={sectionSwitch("colourStory")}>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <F label="العنوان الصغير" name="home.colourStory.eyebrow">
+                  <Input id="s-home.colourStory.eyebrow" className={inputSm} value={s.home.colourStory.eyebrow} onChange={(e) => setHome("colourStory", { eyebrow: e.target.value })} />
+                </F>
+                <F label="العنوان" name="home.colourStory.title">
+                  <Input id="s-home.colourStory.title" className={inputSm} value={s.home.colourStory.title} onChange={(e) => setHome("colourStory", { title: e.target.value })} />
+                </F>
+                <F label="المنتج المعروض" name="home.colourStory.productSlug" hint="يجب أن يكون له لونان أو أكثر">
+                  <Select id="s-home.colourStory.productSlug" className={inputSm} value={s.home.colourStory.productSlug} onChange={(e) => setHome("colourStory", { productSlug: e.target.value })}>
+                    <option value="">تلقائي</option>
+                    {productOptions.map((o) => (
+                      <option key={o.slug} value={o.slug}>
+                        {o.name}
+                      </option>
+                    ))}
+                  </Select>
+                </F>
+              </div>
+            </Section>
+
+            <Section title="وصل حديثاً" aside={sectionSwitch("newArrivals")}>
+              {copyFields("newArrivals")}
+              <F label="المنتجات المعروضة" name="home.newArrivals.source" className="mt-3 sm:w-1/2">
+                <Select id="s-home.newArrivals.source" className={inputSm} value={s.home.newArrivals.source} onChange={(e) => setHome("newArrivals", { source: e.target.value as "newest" | "featured" | "all" })}>
+                  <option value="all">كل المنتجات بالترتيب المحدد</option>
+                  <option value="newest">الأحدث إضافةً</option>
+                  <option value="featured">المنتجات المميزة فقط</option>
+                </Select>
+              </F>
+            </Section>
+
+            <Section title="إطلالة الموسم" description="تُعدَّل صورة الإطلالة ونقاطها من صفحة «الإطلالات»." aside={sectionSwitch("look")}>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <F label="العنوان الصغير" name="home.look.eyebrow">
+                  <Input id="s-home.look.eyebrow" className={inputSm} value={s.home.look.eyebrow} onChange={(e) => setHome("look", { eyebrow: e.target.value })} />
+                </F>
+                <F label="الإطلالة المعروضة" name="home.look.lookSlug">
+                  <Select id="s-home.look.lookSlug" className={inputSm} value={s.home.look.lookSlug} onChange={(e) => setHome("look", { lookSlug: e.target.value })}>
+                    <option value="">أول إطلالة منشورة</option>
+                    {lookOptions.map((o) => (
+                      <option key={o.slug} value={o.slug}>
+                        {o.title}
+                      </option>
+                    ))}
+                  </Select>
+                </F>
+              </div>
+            </Section>
+
+            <Section title="تفاصيل مختارة بعناية" aside={sectionSwitch("craft")}>
+              {copyFields("craft")}
+              <div className="mt-4">
+                <ListEditor
+                  items={s.home.craft.items}
+                  onChange={(items) => setHome("craft", { items })}
+                  create={() => ({ title: "", body: "" })}
+                  max={6}
+                  addLabel="إضافة نقطة"
+                  emptyLabel="لا نقاط — ستظهر النقاط الافتراضية."
+                  itemLabel={(i) => `النقطة ${i + 1}`}
+                  render={(it, update, i) => (
+                    <div className="grid gap-2">
+                      <Input aria-label="عنوان النقطة" className="h-10 text-sm" value={it.title} maxLength={40} onChange={(e) => update({ ...it, title: e.target.value })} placeholder="الخامة أولاً" />
+                      <ActionFieldError name={`home.craft.items.${i}.title`} />
+                      <Textarea aria-label="وصف النقطة" rows={2} className="min-h-0 text-sm" value={it.body} maxLength={240} onChange={(e) => update({ ...it, body: e.target.value })} />
+                    </div>
+                  )}
+                />
+              </div>
+            </Section>
+
+            <Section title="المتابعون وآراء العملاء" description="الشهادات نفسها تُعدَّل في القسم التالي." aside={sectionSwitch("social")}>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <F label="العنوان الصغير" name="home.social.eyebrow">
+                  <Input id="s-home.social.eyebrow" className={inputSm} value={s.home.social.eyebrow} onChange={(e) => setHome("social", { eyebrow: e.target.value })} />
+                </F>
+                <F label="الرقم الكبير" name="home.social.statValue" hint="مثل 69K — فارغ لإخفائه">
+                  <Input id="s-home.social.statValue" dir="ltr" className={inputSm} value={s.home.social.statValue} onChange={(e) => setHome("social", { statValue: e.target.value })} />
+                </F>
+                <F label="العنوان" name="home.social.title">
+                  <Input id="s-home.social.title" className={inputSm} value={s.home.social.title} onChange={(e) => setHome("social", { title: e.target.value })} />
+                </F>
+                <F label="النص" name="home.social.text" className="sm:col-span-3">
+                  <Textarea id="s-home.social.text" rows={2} value={s.home.social.text} onChange={(e) => setHome("social", { text: e.target.value })} />
+                </F>
+              </div>
+            </Section>
+
+            <Section title="دعوة منسّق الإطلالة" aside={sectionSwitch("atelier")}>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <F label="العنوان الصغير" name="home.atelier.eyebrow">
+                  <Input id="s-home.atelier.eyebrow" className={inputSm} value={s.home.atelier.eyebrow} onChange={(e) => setHome("atelier", { eyebrow: e.target.value })} />
+                </F>
+                <F label="نص الزر" name="home.atelier.ctaLabel">
+                  <Input id="s-home.atelier.ctaLabel" className={inputSm} value={s.home.atelier.ctaLabel} onChange={(e) => setHome("atelier", { ctaLabel: e.target.value })} />
+                </F>
+                <F label="العنوان" name="home.atelier.title" className="sm:col-span-2">
+                  <Input id="s-home.atelier.title" className={inputSm} value={s.home.atelier.title} onChange={(e) => setHome("atelier", { title: e.target.value })} />
+                </F>
+                <F label="النص" name="home.atelier.text" className="sm:col-span-2">
+                  <Textarea id="s-home.atelier.text" rows={2} value={s.home.atelier.text} onChange={(e) => setHome("atelier", { text: e.target.value })} />
+                </F>
               </div>
             </Section>
 
@@ -519,19 +701,6 @@ export function SettingsForm({ initial, heroMedia, initialTab }: { initial: Stor
               />
             </Section>
 
-            <Section title="أقسام الصفحة الرئيسية" description="أظهر أو أخفِ أي قسم من الصفحة الرئيسية.">
-              <ul className="grid gap-3 sm:grid-cols-2">
-                {(Object.keys(SECTION_LABELS) as HomeSectionKey[]).map((k) => (
-                  <li key={k} className="rounded-xl border border-line bg-ivory px-4 py-3">
-                    <Switch
-                      checked={s.home.sections[k]}
-                      onChange={(e) => setS((p) => ({ ...p, home: { ...p.home, sections: { ...p.home.sections, [k]: e.target.checked } } }))}
-                      label={SECTION_LABELS[k]}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </Section>
           </div>
 
           <div role="tabpanel" id="panel-markets" aria-labelledby="tab-markets" hidden={tab !== "markets"} className="space-y-5">
@@ -599,6 +768,7 @@ export function SettingsForm({ initial, heroMedia, initialTab }: { initial: Stor
                   const base = JSON.parse(saved) as StoreSettings;
                   setS(base);
                   setHero(base.hero.mediaId ? (hero[0]?.id === base.hero.mediaId ? hero : heroMedia && heroMedia.id === base.hero.mediaId ? [heroMedia] : [{ id: base.hero.mediaId }]) : []);
+                  setMobileHero(base.hero.mobileMediaId ? (mobileHero[0]?.id === base.hero.mobileMediaId ? mobileHero : [{ id: base.hero.mobileMediaId }]) : []);
                   setErrors({});
                 }}
                 className="hidden h-10 rounded-full px-4 text-sm text-taupe hover:bg-bone hover:text-espresso sm:inline-flex sm:items-center"
@@ -659,15 +829,6 @@ function TonePicker({ value, onChange }: { value: BarTone; onChange: (t: BarTone
   );
 }
 
-const SECTION_LABELS: Record<HomeSectionKey, string> = {
-  categories: "شبكة الأقسام",
-  colourStory: "قصة الألوان",
-  newArrivals: "وصل حديثاً",
-  look: "إطلالة الموسم",
-  craft: "تفاصيل مختارة بعناية",
-  social: "آراء العملاء وإنستغرام",
-  atelier: "دعوة منسّق الإطلالة",
-};
 
 const CURRENCY_PRESETS: Omit<MarketCurrency, "basePerUnit" | "markup" | "enabled">[] = [
   { code: "SAR", symbol: "ر.س", label: "ريال سعودي", position: "after", decimals: 0, roundTo: 1 },

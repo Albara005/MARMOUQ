@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowUpLeft } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
-import { getMediaRefs } from "@/lib/catalog";
+import { getMediaRefs, listLooks, listProducts } from "@/lib/catalog";
 import { PageHeader } from "@/components/admin/ui";
 import { SettingsForm } from "@/components/admin/settings/settings-form";
 
@@ -14,8 +14,16 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   await requireAdmin("manager");
   const sp = await searchParams;
   const settings = await getSettings();
-  const [heroMedia] = settings.hero.mediaId ? await getMediaRefs([settings.hero.mediaId]) : [];
-  const initial = heroMedia ? settings : { ...settings, hero: { ...settings.hero, mediaId: null } };
+  const ids = [settings.hero.mediaId, settings.hero.mobileMediaId].filter((x): x is string => !!x);
+  const [refs, products, looks] = await Promise.all([ids.length ? getMediaRefs(ids) : Promise.resolve([]), listProducts({ limit: 100 }), listLooks(50)]);
+  const heroMedia = refs.find((m) => m.id === settings.hero.mediaId);
+  const mobileHeroMedia = refs.find((m) => m.id === settings.hero.mobileMediaId) ?? null;
+  const initial = {
+    ...settings,
+    hero: { ...settings.hero, mediaId: heroMedia ? settings.hero.mediaId : null, mobileMediaId: mobileHeroMedia ? settings.hero.mobileMediaId : null },
+  };
+  const productOptions = products.items.filter((p) => p.colors.length >= 2).map((p) => ({ slug: p.slug, name: p.name }));
+  const lookOptions = looks.map((l) => ({ slug: l.slug, title: l.title }));
 
   return (
     <div>
@@ -30,7 +38,13 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           </Link>
         }
       />
-      <SettingsForm initial={initial} heroMedia={heroMedia ?? null} initialTab={typeof sp.tab === "string" ? sp.tab : "identity"} />
+      <SettingsForm
+        initial={initial}
+        heroMedia={heroMedia ?? null}
+        mobileHeroMedia={mobileHeroMedia}
+        productOptions={productOptions}
+        lookOptions={lookOptions}
+        initialTab={typeof sp.tab === "string" ? sp.tab : "identity"} />
     </div>
   );
 }

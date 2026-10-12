@@ -13,7 +13,6 @@ import { AtelierBand, type AtelierSlot } from "@/components/store/home/atelier-b
 
 export const dynamic = "force-dynamic";
 
-const SIGNATURE_SLUG = "half-zip-cable-knit-sweater";
 const MARQUEE_TONE = { ivory: "light", espresso: "dark", copper: "copper", burgundy: "burgundy", navy: "navy" } as const;
 const SLOT_LABELS: Record<string, string> = { knit: "التريكو", shirt: "القميص", tie: "الربطة", trousers: "البنطال", shoes: "الحذاء" };
 const SLOT_ORDER = ["knit", "shirt", "tie", "trousers", "shoes"];
@@ -45,11 +44,17 @@ function firstImageFor(products: ProductCardData[], predicate: (p: ProductCardDa
 
 export default async function HomePage() {
   const settings = await getSettings();
-  const [categories, { items: products }, looks, signatureBySlug] = await Promise.all([
+  const home = settings.home;
+  const [categories, { items: products }, looks, signatureBySlug, arrivals] = await Promise.all([
     listCategories(),
     listProducts({ limit: 24 }),
-    listLooks(4),
-    getProductBySlug(SIGNATURE_SLUG),
+    listLooks(12),
+    home.colourStory.productSlug ? getProductBySlug(home.colourStory.productSlug) : Promise.resolve(null),
+    home.newArrivals.source === "featured"
+      ? listProducts({ featured: true, limit: 12 }).then((r) => r.items)
+      : home.newArrivals.source === "newest"
+        ? listProducts({ sort: "newest", limit: 12 }).then((r) => r.items)
+        : Promise.resolve(null),
   ]);
 
   // Signature product for the colour story: the half-zip, else any multi-colour piece.
@@ -60,7 +65,9 @@ export default async function HomePage() {
   }
 
   // Hero: configured media → first look cover → first product image
-  const configuredHero = settings.hero.mediaId ? ((await getMediaRefs([settings.hero.mediaId]))[0] ?? null) : null;
+  const heroRefs = await getMediaRefs([settings.hero.mediaId, settings.hero.mobileMediaId].filter((x): x is string => !!x));
+  const configuredHero = heroRefs.find((m) => m.id === settings.hero.mediaId) ?? null;
+  const mobileHero = heroRefs.find((m) => m.id === settings.hero.mobileMediaId) ?? null;
   const heroMedia = configuredHero ?? looks.find((l) => l.cover)?.cover ?? products[0]?.images[0] ?? null;
 
   // Category fallbacks (first product photo of the category)
@@ -86,7 +93,7 @@ export default async function HomePage() {
   for (const l of looks) pushMedia(l.cover);
   for (const p of products) pushMedia(p.images[0]);
 
-  const featuredLook = looks.find((l) => l.items.length > 0) ?? null;
+  const featuredLook = (home.look.lookSlug ? looks.find((l) => l.slug === home.look.lookSlug && l.items.length > 0) : null) ?? looks.find((l) => l.items.length > 0) ?? null;
   const show = settings.home.sections;
 
   const jsonLd = {
@@ -113,25 +120,30 @@ export default async function HomePage() {
         subtitle={settings.hero.subtitle}
         ctaLabel={settings.hero.ctaLabel}
         ctaHref={settings.hero.ctaHref}
+        mobileMedia={mobileHero}
+        overlay={settings.hero.overlay}
+        secondaryLabel={settings.hero.secondaryLabel}
+        secondaryHref={settings.hero.secondaryHref}
+        sideText={settings.hero.sideText}
       />
 
       <div id="home-after-hero" className="scroll-mt-20">
         {settings.bars.marquee.enabled && <Marquee items={settings.bars.marquee.items} tone={MARQUEE_TONE[settings.bars.marquee.tone] ?? "light"} speed={settings.bars.marquee.speed} />}
       </div>
 
-      {show.categories && <CategoriesGrid categories={categories} fallbacks={fallbacks} />}
+      {show.categories && <CategoriesGrid categories={categories} fallbacks={fallbacks} copy={home.categories} />}
 
-      {show.colourStory && signature && signature.colors.length >= 2 && <ColourStory product={signature} />}
+      {show.colourStory && signature && signature.colors.length >= 2 && <ColourStory product={signature} eyebrow={home.colourStory.eyebrow} title={home.colourStory.title} />}
 
-      {show.newArrivals && <NewArrivals products={products} />}
+      {show.newArrivals && <NewArrivals products={arrivals?.length ? arrivals : products} copy={home.newArrivals} />}
 
-      {show.look && featuredLook && <LookOfSeason look={featuredLook} />}
+      {show.look && featuredLook && <LookOfSeason look={featuredLook} eyebrow={home.look.eyebrow} />}
 
-      {show.craft && <CraftValues />}
+      {show.craft && <CraftValues copy={home.craft} />}
 
-      {show.social && <SocialProof testimonials={settings.testimonials} instagram={settings.instagram} gallery={gallery} />}
+      {show.social && <SocialProof testimonials={settings.testimonials} instagram={settings.instagram} gallery={gallery} copy={home.social} />}
 
-      {show.atelier && <AtelierBand slots={slots} />}
+      {show.atelier && <AtelierBand slots={slots} copy={home.atelier} />}
     </>
   );
 }

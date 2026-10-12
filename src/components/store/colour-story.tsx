@@ -62,7 +62,7 @@ const LINES: Record<string, string> = {
  * "The Colour Story": colour chips cross-fade the hero shot and tint the whole section
  * to a muted version of the chosen colour.
  */
-export function ColourStory({ product }: { product: ProductDetail }) {
+export function ColourStory({ product, eyebrow = "The Colour Story", title = "قصة الألوان" }: { product: ProductDetail; eyebrow?: string; title?: string }) {
   const colors = product.colors;
   const [active, setActive] = useState(0);
   const chipRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -118,10 +118,10 @@ export function ColourStory({ product }: { product: ProductDetail }) {
         <div className="lg:col-span-5" data-reveal>
           <p className={cn("eyebrow inline-flex items-center gap-3", theme.dark && "text-copper-soft")}>
             <span className="h-px w-8 bg-current opacity-60" aria-hidden />
-            The Colour Story
+            {eyebrow}
           </p>
           <h2 id="colour-story-title" className="display mt-5 text-[2.4rem] leading-[1.1] md:text-6xl">
-            قصة الألوان
+            {title}
           </h2>
           <p className={cn("mt-4 max-w-md text-[0.98rem] leading-8", theme.dark ? "text-paper/75" : "text-umber")}>
             {product.name}

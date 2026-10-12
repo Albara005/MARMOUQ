@@ -79,6 +79,14 @@ const settingsSchema = z
         .string()
         .regex(/^[a-f0-9]{8,64}$/)
         .nullable(),
+      mobileMediaId: z
+        .string()
+        .regex(/^[a-f0-9]{8,64}$/)
+        .nullable(),
+      overlay: z.coerce.number().int().min(0).max(90),
+      secondaryLabel: text(30),
+      secondaryHref: z.union([z.literal(""), href]),
+      sideText: text(60),
     }),
     payments: z.object({
       cod: z.object({ enabled: z.boolean(), label: required(2, 40, "اسم الطريقة مطلوب"), note: text(300) }),
@@ -144,6 +152,18 @@ const settingsSchema = z
         social: z.boolean(),
         atelier: z.boolean(),
       }),
+      categories: z.object({ eyebrow: text(40), title: required(2, 80, "العنوان مطلوب"), subtitle: text(240) }),
+      colourStory: z.object({ eyebrow: text(40), title: required(2, 80, "العنوان مطلوب"), productSlug: text(80) }),
+      newArrivals: z.object({ eyebrow: text(40), title: required(2, 80, "العنوان مطلوب"), subtitle: text(240), source: z.enum(["newest", "featured", "all"]) }),
+      look: z.object({ eyebrow: text(40), lookSlug: text(80) }),
+      craft: z.object({
+        eyebrow: text(40),
+        title: required(2, 80, "العنوان مطلوب"),
+        subtitle: text(240),
+        items: z.array(z.object({ title: required(2, 40, "العنوان مطلوب"), body: text(240) })).max(6, "6 نقاط كحد أقصى"),
+      }),
+      social: z.object({ eyebrow: text(40), statValue: text(12), title: required(2, 80, "العنوان مطلوب"), text: text(240) }),
+      atelier: z.object({ eyebrow: text(40), title: required(2, 80, "العنوان مطلوب"), text: text(300), ctaLabel: required(2, 30, "نص الزر مطلوب") }),
     }),
   })
   .superRefine((v, ctx) => {
@@ -176,9 +196,11 @@ export async function saveSettingsAction(_prev: ActionResult, formData: FormData
   if (!parsed.success) return actionError("لم تُحفظ الإعدادات — راجع الحقول المظلّلة", zodFieldErrors(parsed.error));
   const v = parsed.data;
 
-  if (v.hero.mediaId) {
-    const found = await db.select({ id: media.id }).from(media).where(inArray(media.id, [v.hero.mediaId]));
-    if (!found.length) return actionError("صورة الواجهة غير موجودة", { "hero.mediaId": "ارفع الصورة من جديد" });
+  const heroIds = [v.hero.mediaId, v.hero.mobileMediaId].filter((x): x is string => !!x);
+  if (heroIds.length) {
+    const found = await db.select({ id: media.id }).from(media).where(inArray(media.id, heroIds));
+    if (v.hero.mediaId && !found.some((f) => f.id === v.hero.mediaId)) return actionError("صورة الواجهة غير موجودة", { "hero.mediaId": "ارفع الصورة من جديد" });
+    if (v.hero.mobileMediaId && !found.some((f) => f.id === v.hero.mobileMediaId)) return actionError("صورة الجوال غير موجودة", { "hero.mobileMediaId": "ارفع الصورة من جديد" });
   }
 
   const current = await getSettings();

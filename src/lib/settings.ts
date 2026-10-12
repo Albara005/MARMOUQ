@@ -53,6 +53,14 @@ export type StoreSettings = {
     ctaHref: string;
     /** media id of the hero image (falls back to the first featured look cover) */
     mediaId: string | null;
+    /** Optional portrait image for phones */
+    mobileMediaId: string | null;
+    /** Darkness of the overlay on the image, 0–90 (%) */
+    overlay: number;
+    secondaryLabel: string;
+    secondaryHref: string;
+    /** Small vertical latin signature on desktop ("" hides it) */
+    sideText: string;
   };
   payments: {
     cod: { enabled: boolean; label: string; note: string };
@@ -74,7 +82,16 @@ export type StoreSettings = {
     announcement: { enabled: boolean; tone: BarTone; href: string; interval: number };
     marquee: { enabled: boolean; tone: BarTone; items: string[]; speed: number };
   };
-  home: { sections: Record<HomeSectionKey, boolean> };
+  home: {
+    sections: Record<HomeSectionKey, boolean>;
+    categories: { eyebrow: string; title: string; subtitle: string };
+    colourStory: { eyebrow: string; title: string; productSlug: string };
+    newArrivals: { eyebrow: string; title: string; subtitle: string; source: "newest" | "featured" | "all" };
+    look: { eyebrow: string; lookSlug: string };
+    craft: { eyebrow: string; title: string; subtitle: string; items: { title: string; body: string }[] };
+    social: { eyebrow: string; statValue: string; title: string; text: string };
+    atelier: { eyebrow: string; title: string; text: string; ctaLabel: string };
+  };
 };
 
 export const DEFAULT_SETTINGS: StoreSettings = {
@@ -99,6 +116,11 @@ export const DEFAULT_SETTINGS: StoreSettings = {
     ctaLabel: "تسوّق المجموعة",
     ctaHref: "/shop",
     mediaId: null,
+    mobileMediaId: null,
+    overlay: 45,
+    secondaryLabel: "نسّق إطلالتك",
+    secondaryHref: "/atelier",
+    sideText: "Est. Yemen — Italian Craft",
   },
   payments: {
     cod: { enabled: true, label: "الدفع عند الاستلام", note: "ادفع نقداً عند وصول طلبك إلى باب منزلك." },
@@ -129,7 +151,31 @@ export const DEFAULT_SETTINGS: StoreSettings = {
     announcement: { enabled: true, tone: "espresso", href: "", interval: 5 },
     marquee: { enabled: true, tone: "ivory", items: ["قطن 100%", "صنع إيطالي 🇮🇹", "قصّات مدروسة", "توصيل لكل المحافظات", "الدفع عند الاستلام", "استبدال سهل"], speed: 38 },
   },
-  home: { sections: { categories: true, colourStory: true, newArrivals: true, look: true, craft: true, social: true, atelier: true } },
+  home: {
+    sections: { categories: true, colourStory: true, newArrivals: true, look: true, craft: true, social: true, atelier: true },
+    categories: { eyebrow: "The Wardrobe", title: "خزانة الرجل المرموق", subtitle: "من التريكو الإيطالي إلى الشوز المصنوع يدوياً — كل قسم منتقى ليكمل الآخر." },
+    colourStory: { eyebrow: "The Colour Story", title: "قصة الألوان", productSlug: "half-zip-cable-knit-sweater" },
+    newArrivals: { eyebrow: "New Arrivals", title: "وصل حديثاً", subtitle: "قطع الموسم بألوانها كاملة — اختر لونك وخلّ الباقي علينا.", source: "all" },
+    look: { eyebrow: "Look of the Season", lookSlug: "" },
+    craft: {
+      eyebrow: "The Marmouq Standard",
+      title: "تفاصيل مختارة بعناية",
+      subtitle: "أربعة مبادئ نلتزم فيها بكل قطعة توصلك — لأن الأناقة الحقيقية في التفاصيل.",
+      items: [
+        { title: "الخامة أولاً", body: "قطن 100% بملمس ناعم يتنفّس معك طول اليوم، ويحافظ على شكله وألوانه غسلة بعد غسلة." },
+        { title: "صنعة إيطالية", body: "تريكو بضفائر كلاسيكية وسحّاب معدني متين، مصنوع في إيطاليا بمعايير الدور العريقة." },
+        { title: "القصّة الصحيحة", body: "بناطيل بالقالب الكوري الصحيح: بِليتس أمامية وخصر مرتفع يعطيك وقفة أطول وأرتب." },
+        { title: "تنسيق متكامل", body: "كل قطعة مختارة لتكمل الأخرى — من ربطة العنق الحريرية حتى الشوز الإيطالي." },
+      ],
+    },
+    social: { eyebrow: "The Community", statValue: "69K", title: "رجل مرموق يتابعنا", text: "إطلالات يومية، قطع جديدة قبل الكل، وتنسيقات من عملائنا في كل المحافظات." },
+    atelier: {
+      eyebrow: "The Atelier",
+      title: "نسّق إطلالتك بنفسك، قطعة بقطعة",
+      text: "اختر السويتر، القميص، الربطة، البنطال والشوز — وشوف إطلالتك تكتمل قدامك مع سعرها النهائي قبل ما تطلب.",
+      ctaLabel: "ابدأ التنسيق الآن",
+    },
+  },
 };
 
 const KEY = "store";

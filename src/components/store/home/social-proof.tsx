@@ -8,7 +8,17 @@ import { cn } from "@/lib/utils";
 
 type Testimonial = { name: string; city: string; quote: string };
 
-export function SocialProof({ testimonials, instagram, gallery }: { testimonials: Testimonial[]; instagram: string; gallery: MediaRef[] }) {
+export function SocialProof({
+  testimonials,
+  instagram,
+  gallery,
+  copy = { eyebrow: "The Community", statValue: "69K", title: "رجل مرموق يتابعنا", text: "" },
+}: {
+  testimonials: Testimonial[];
+  instagram: string;
+  gallery: MediaRef[];
+  copy?: { eyebrow: string; statValue: string; title: string; text: string };
+}) {
   const quotes = testimonials.filter((t) => t.quote?.trim()).slice(0, 3);
   const handle = instagram ? instagramHandle(instagram) : "";
   const tiles = gallery.slice(0, 6);
@@ -21,15 +31,18 @@ export function SocialProof({ testimonials, instagram, gallery }: { testimonials
           <div className="lg:col-span-5" data-reveal>
             <p className="eyebrow inline-flex items-center gap-3">
               <span className="h-px w-8 bg-gold/70" aria-hidden />
-              The Community
+              {copy.eyebrow}
             </p>
-            <p className="mt-6 flex items-start gap-1 font-[family-name:var(--font-latin)] text-[5.5rem] font-medium leading-[0.85] text-espresso md:text-[8rem]" dir="ltr">
-              <span className="text-copper">+</span>69K
-            </p>
+            {copy.statValue && (
+              <p className="mt-6 flex items-start gap-1 font-[family-name:var(--font-latin)] text-[5.5rem] font-medium leading-[0.85] text-espresso md:text-[8rem]" dir="ltr">
+                <span className="text-copper">+</span>
+                {copy.statValue}
+              </p>
+            )}
             <h2 id="proof-title" className="display mt-5 text-3xl leading-tight text-espresso md:text-4xl">
-              رجل مرموق يتابعنا
+              {copy.title}
             </h2>
-            <p className="mt-3 max-w-sm text-[0.95rem] leading-8 text-umber">إطلالات يومية، قطع جديدة قبل الكل، وتنسيقات من عملائنا في كل المحافظات.</p>
+            {copy.text && <p className="mt-3 max-w-sm text-[0.95rem] leading-8 text-umber">{copy.text}</p>}
             {instagram && (
               <a href={instagram} target="_blank" rel="noopener noreferrer" className={buttonClasses("outline", "lg", "group mt-8")}>
                 <InstagramIcon size={18} />
